@@ -6,7 +6,7 @@ export default function Home() {
       {/* Hero */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-16 md:py-24">
         <p className="text-xs tracking-widest uppercase text-slate-400 mb-4">
-          M1 Gouvernance des Données - BRÉF
+          M1 Gouvernance des Données
         </p>
 
         <h1 className="text-[28px] md:text-[36px] font-bold text-slate-900 tracking-tight text-center mb-4">
@@ -55,7 +55,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="py-6 text-center text-[11px] text-slate-300">
-        BRÉF - M1 Gouvernance des Données - Assemblée nationale, Sénat, Ministère de l&apos;Intérieur
+        M1 Gouvernance des Données - Clément CHANUT GIRARDI
       </footer>
     </div>
   );
