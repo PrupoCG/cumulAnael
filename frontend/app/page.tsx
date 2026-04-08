@@ -40,7 +40,7 @@ export default function Home() {
           <div className="bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-xl p-5 text-center">
             <h3 className="text-[14px] font-bold text-slate-800 mb-1.5">Listes nominatives</h3>
             <p className="text-[12px] text-slate-500 leading-relaxed">
-              Filtrage par nœud ou flux, recherche par nom, export CSV, profils BRÉF enrichis
+              Filtrage par nœud ou flux, recherche par nom, export CSV
             </p>
           </div>
 
