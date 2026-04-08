@@ -6,11 +6,11 @@ export default function Home() {
       {/* Hero */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-16 md:py-24">
         <p className="text-xs tracking-widest uppercase text-slate-400 mb-4">
-          M1 Gouvernance des Données — BRÉF
+          M1 Gouvernance des Données - BRÉF
         </p>
 
-        <h1 className="text-[36px] md:text-[48px] font-bold text-slate-900 tracking-tight text-center mb-4">
-          cumul<span className="text-slate-500">Anael</span>
+        <h1 className="text-[28px] md:text-[36px] font-bold text-slate-900 tracking-tight text-center mb-4">
+          Cumul des mandats et démissions
         </h1>
 
         <p className="text-slate-500 text-[16px] md:text-[18px] text-center max-w-2xl leading-relaxed mb-3">
@@ -18,7 +18,7 @@ export default function Home() {
           <strong className="text-slate-700">démissions</strong> des parlementaires élus à une fonction exécutive municipale.
         </p>
         <p className="text-slate-400 text-[14px] text-center max-w-xl leading-relaxed mb-10">
-          Municipales 2020 &amp; 2026 — Données SUIVI_MUN_V3 enrichies par BRÉF
+          Municipales 2020 &amp; 2026 - Données SUIVI_MUN_V3
         </p>
 
         <Link
@@ -55,7 +55,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="py-6 text-center text-[11px] text-slate-300">
-        BRÉF — M1 Gouvernance des Données — Assemblée nationale, Sénat, Ministère de l&apos;Intérieur
+        BRÉF - M1 Gouvernance des Données - Assemblée nationale, Sénat, Ministère de l&apos;Intérieur
       </footer>
     </div>
   );
