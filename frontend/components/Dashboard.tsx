@@ -729,7 +729,7 @@ function SankeyView({
       {/* Source */}
       <div className="text-center mt-3 text-[11px] text-slate-300">
         <Users size={11} className="inline mr-1" />
-        Source : SUIVI_MUN_V3 - M1 Gouvernance des Données
+        M1 Gouvernance des Données - <strong className="font-semibold">Clément CHANUT GIRARDI</strong>
       </div>
     </div>
   );
