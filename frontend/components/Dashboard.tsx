@@ -399,7 +399,7 @@ function SankeyView({
             </h1>
           </div>
           <p className="text-slate-400 text-[13px] max-w-xl mx-auto leading-relaxed">
-            Cliquez sur un flux ou un nœud pour filtrer — cliquez sur une personne en bas pour tracer son chemin individuel
+            Cliquez sur un flux ou un nœud pour filtrer - cliquez sur une personne en bas pour tracer son chemin individuel
           </p>
         </div>
       </div>
@@ -523,7 +523,7 @@ function SankeyView({
       {nodeStats && (
         <StatsPanel
           stats={nodeStats}
-          title={`Statistiques — ${selectedNode ? (NODE_LABELS[selectedNode] || selectedNode) : ""}`}
+          title={`Statistiques - ${selectedNode ? (NODE_LABELS[selectedNode] || selectedNode) : ""}`}
         />
       )}
 
@@ -655,7 +655,7 @@ function SankeyView({
                       <td className="px-3 py-2">
                         {p.interco ? (
                           <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-teal-50 text-teal-700">{p.interco}</span>
-                        ) : "—"}
+                        ) : "-"}
                       </td>
                       <td className="px-3 py-2">
                         {p.issue === "Démissionnaire" ? (
@@ -723,7 +723,7 @@ function SankeyView({
             {colorMode === "etapes" ? (
               <><strong className="text-slate-600">Cumul & démission (d3-sankey)</strong> : rendu SVG natif avec tooltips au survol. Cliquez sur un flux ou un nœud pour filtrer, puis sur une personne pour tracer son chemin individuel.</>
             ) : (
-              <><strong className="text-slate-600">Cumul & démission — origine (d3-sankey)</strong> : rendu SVG natif — les flux ex-CM sont toujours en haut, sans-CM en bas. Le chemin individuel est tracé exactement dans la bonne zone de couleur.</>
+              <><strong className="text-slate-600">Cumul & démission - origine (d3-sankey)</strong> : rendu SVG natif - les flux ex-CM sont toujours en haut, sans-CM en bas. Le chemin individuel est tracé exactement dans la bonne zone de couleur.</>
             )}
           </p>
         </div>
@@ -732,7 +732,7 @@ function SankeyView({
       {/* Source */}
       <div className="text-center mt-3 text-[11px] text-slate-300">
         <Users size={11} className="inline mr-1" />
-        Source : SUIVI_MUN_V3 — BRÉF / M1 Gouvernance des Données
+        Source : SUIVI_MUN_V3 - M1 Gouvernance des Données
       </div>
     </div>
   );
