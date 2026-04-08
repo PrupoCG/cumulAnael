@@ -11,11 +11,14 @@ COPY api/ ./api/
 COPY scripts/ ./scripts/
 COPY entrypoint.sh ./
 
+# Seed data (Excel intégré à l'image)
+COPY seed/ ./data/
+
 # Install dependencies
 RUN uv sync --no-dev
 
-# Data volume (mount at runtime)
-RUN mkdir -p /app/data
+# Generate DuckDB at build time
+RUN uv run python scripts/load_suivi_mun.py
 
 EXPOSE 8001
 
