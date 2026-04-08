@@ -9,6 +9,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY pyproject.toml ./
 COPY api/ ./api/
 COPY scripts/ ./scripts/
+COPY entrypoint.sh ./
 
 # Install dependencies
 RUN uv sync --no-dev
@@ -18,4 +19,5 @@ RUN mkdir -p /app/data
 
 EXPOSE 8001
 
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["uv", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8001"]
