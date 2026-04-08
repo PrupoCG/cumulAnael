@@ -10,6 +10,7 @@ COPY pyproject.toml ./
 COPY api/ ./api/
 COPY scripts/ ./scripts/
 COPY entrypoint.sh ./
+RUN chmod +x /app/entrypoint.sh
 
 # Seed data (Excel intégré à l'image)
 COPY seed/ ./data/
