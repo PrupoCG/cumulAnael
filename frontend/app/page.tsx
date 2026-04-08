@@ -5,9 +5,6 @@ import Link from "next/link";
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f8fafc 100%)" }}>
-      {/* Ligne d'accent */}
-      <div className="h-1 w-full" style={{ background: "linear-gradient(90deg, #2563eb, #6366f1, #2563eb)" }} />
-
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-20 md:py-28">
         {/* Badge contexte */}
         <span
@@ -98,7 +95,6 @@ export default function Home() {
                 background: "#ffffff",
                 border: "1px solid #e2e8f0",
                 boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
-                borderTop: `3px solid ${card.accent}`,
               }}
             >
               <span
@@ -123,7 +119,7 @@ export default function Home() {
         className="py-6 text-center text-[11px]"
         style={{ color: "#94a3b8", borderTop: "1px solid #e2e8f0" }}
       >
-        M1 Gouvernance des Données - Clément CHANUT GIRARDI
+        M1 Gouvernance des Données - <strong className="font-semibold">Clément CHANUT GIRARDI</strong>
       </footer>
     </div>
   );
