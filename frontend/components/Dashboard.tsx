@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { Scale, Users, Loader2, ArrowLeft, Download, X, Search } from "lucide-react";
+import { Users, Loader2, ArrowLeft, Download, X, Search } from "lucide-react";
 import SankeyVisxChart from "./SankeyVisxChart";
 import StatsPanel, { type NodeStats } from "./StatsPanel";
 import DeputePhoto from "./DeputePhoto";
@@ -391,9 +391,6 @@ function SankeyView({
       <div className="mb-6">
         <div className="text-center">
           <div className="inline-flex items-center gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-              <Scale size={18} className="text-amber-600" />
-            </div>
             <h1 className="text-[22px] font-bold text-slate-900 tracking-tight text-center">
               Cumul municipal et démission des parlementaires élus à une fonction exécutive
             </h1>
