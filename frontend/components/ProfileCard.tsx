@@ -63,9 +63,10 @@ function formatDate(d: string | null): string {
 type ProfileCardProps = {
   person: Person;
   onClose: () => void;
+  annee?: number;
 };
 
-export default function ProfileCard({ person, onClose }: ProfileCardProps) {
+export default function ProfileCard({ person, onClose, annee }: ProfileCardProps) {
   const [bref, setBref] = useState<BrefProfile | null>(null);
 
   useEffect(() => {
@@ -122,14 +123,19 @@ export default function ProfileCard({ person, onClose }: ProfileCardProps) {
                   {person.fonction}
                 </span>
               )}
-              {person.interco && (
+              {annee !== 26 && person.interco && (
                 <span className="px-2 py-0.5 text-[11px] font-medium rounded-full bg-teal-100 text-teal-700">
                   {person.interco}
                 </span>
               )}
               {person.issue === "Démissionnaire" && (
                 <span className="px-2 py-0.5 text-[11px] font-medium rounded-full bg-orange-100 text-orange-700">
-                  Démissionnaire
+                  Démission parl.
+                </span>
+              )}
+              {person.issue === "Démission CM" && (
+                <span className="px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-700">
+                  Démission CM
                 </span>
               )}
             </div>

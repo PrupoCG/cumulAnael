@@ -522,7 +522,7 @@ function SankeyView({
 
       {/* Profile card */}
       {highlightedPerson !== null && filteredPersons?.[highlightedPerson] && (
-        <ProfileCard person={filteredPersons[highlightedPerson]} onClose={() => setHighlightedPerson(null)} />
+        <ProfileCard person={filteredPersons[highlightedPerson]} onClose={() => setHighlightedPerson(null)} annee={annee} />
       )}
 
       {/* Stats panel */}
