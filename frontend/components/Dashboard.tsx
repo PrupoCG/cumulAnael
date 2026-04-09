@@ -71,7 +71,8 @@ const NODE_LABELS: Record<string, string> = {
   sans_interco: "Sans interco",
   garde_cm_cc: "CM-CC",
   garde_cm: "CM",
-  demission: "Démissionnaires",
+  demission: "Démission parlementaire",
+  demission_cm: "Démission CM",
 };
 
 const MODERN_NODE_COLORS = [
@@ -287,9 +288,13 @@ function SankeyView({
 
   const exportCsv = useCallback(() => {
     if (!filteredPersons) return;
-    const headers = ["Nom", "Prénom", "Mandat national", "Candidature", "Résultat", "Fonction", "Interco", "Position sortie", "Nuance", "Département", "Commune"];
+    const headers = annee === 26
+      ? ["Nom", "Prénom", "Mandat national", "Candidature", "Résultat", "Fonction", "Position sortie", "Nuance", "Département", "Commune"]
+      : ["Nom", "Prénom", "Mandat national", "Candidature", "Résultat", "Fonction", "Interco", "Position sortie", "Nuance", "Département", "Commune"];
     const rows = filteredPersons.map((p) =>
-      [p.nom, p.prenom, p.mandat_national, p.candidature, p.resultat, p.fonction, p.interco, p.issue, p.nuance, p.departement, p.commune]
+      (annee === 26
+        ? [p.nom, p.prenom, p.mandat_national, p.candidature, p.resultat, p.fonction, p.issue, p.nuance, p.departement, p.commune]
+        : [p.nom, p.prenom, p.mandat_national, p.candidature, p.resultat, p.fonction, p.interco, p.issue, p.nuance, p.departement, p.commune])
         .map((v) => `"${(v || "").replace(/"/g, '""')}"`)
         .join(";")
     );
@@ -316,6 +321,7 @@ function SankeyView({
     const fonc = p.fonction === "Maire" ? "maire"
                : p.fonction === "Adjoint" ? "adjoint" : "cm_simple";
     const iss = p.issue === "Démissionnaire" ? "demission"
+              : p.issue === "Démission CM" ? "demission_cm"
               : (p.interco === "Pdt CC" || p.interco === "VP CC" || p.interco === "CC") ? "garde_cm_cc"
               : "garde_cm";
     // En 2026 l'étape interco n'existe pas dans le Sankey → sauter
@@ -629,7 +635,7 @@ function SankeyView({
                     <th className="px-3 py-2">Candidature</th>
                     <th className="px-3 py-2">Résultat</th>
                     <th className="px-3 py-2">Fonction</th>
-                    <th className="px-3 py-2">Interco</th>
+                    {annee !== 26 && <th className="px-3 py-2">Interco</th>}
                     <th className="px-3 py-2">Position sortie</th>
                     <th className="px-3 py-2">Nuance</th>
                     <th className="px-3 py-2">Département</th>
@@ -651,14 +657,18 @@ function SankeyView({
                         </span>
                       </td>
                       <td className="px-3 py-2 text-slate-500">{p.fonction}</td>
-                      <td className="px-3 py-2">
-                        {p.interco ? (
-                          <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-teal-50 text-teal-700">{p.interco}</span>
-                        ) : "-"}
-                      </td>
+                      {annee !== 26 && (
+                        <td className="px-3 py-2">
+                          {p.interco ? (
+                            <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-teal-50 text-teal-700">{p.interco}</span>
+                          ) : "-"}
+                        </td>
+                      )}
                       <td className="px-3 py-2">
                         {p.issue === "Démissionnaire" ? (
-                          <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-orange-50 text-orange-700">Démissionnaire</span>
+                          <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-orange-50 text-orange-700">Démission parl.</span>
+                        ) : p.issue === "Démission CM" ? (
+                          <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700">Démission CM</span>
                         ) : p.issue || "—"}
                       </td>
                       <td className="px-3 py-2">

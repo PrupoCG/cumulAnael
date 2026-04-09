@@ -1141,12 +1141,13 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
             END AS interco,
             CASE
                 WHEN mvmt_parlementaire = 'Démissionnaire' THEN 'demission'
+                WHEN elu_cm = 1 AND statut_cm_2 = 'Démissionnaire' THEN 'demission_cm'
                 WHEN elu_cm = 1 THEN 'garde'
                 ELSE NULL
             END AS outcome,
             CASE
-                WHEN elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%' THEN 'exit_cm_cc'
-                WHEN elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') THEN 'exit_cm'
+                WHEN elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND statut_cm_2 != 'Démissionnaire' AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%' THEN 'exit_cm_cc'
+                WHEN elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') THEN 'exit_cm'
                 ELSE NULL
             END AS exit_cm,
             COUNT(*) AS value
@@ -1200,19 +1201,20 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
     n_garde_cm_cc = _sum(rows, outcome="garde", exit_cm="exit_cm_cc")
     n_garde_cm = _sum(rows, outcome="garde", exit_cm="exit_cm")
     n_demission = _sum(rows, outcome="demission")
+    n_demission_cm = _sum(rows, outcome="demission_cm")
 
     # Helper to format label with count — hide empty nodes for fixed arrangement
     def _lc(label, count):
         return f"{label} ({count})" if count > 0 else ""
 
-    # 18 nodes — context-dependent labels (3 entry, 3 exit)
+    # 19 nodes — context-dependent labels (3 entry, 4 exit)
     node_keys = [
         "entry_with_cm_cc", "entry_with_cm", "entry_without_cm",
         "candidat_cm", "non_candidat_cm",
         "elu_cm", "non_elu_cm", "non_reelu_cm",
         "cm_simple", "adjoint", "maire",
         "cc_simple", "vp_cc", "pdt_cc", "sans_interco",
-        "garde_cm_cc", "garde_cm", "demission",
+        "garde_cm_cc", "garde_cm", "demission", "demission_cm",
     ]
     labels = [
         _lc(f"{code}-CM-CC", n_entry_cm_cc),     # 0
@@ -1233,6 +1235,7 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
         _lc(f"{code}-CM-CC", n_garde_cm_cc),       # 15
         _lc(f"{code}-CM", n_garde_cm),             # 16
         _lc(f"Démission {code}", n_demission),     # 17
+        _lc("Démission CM", n_demission_cm),       # 18
     ]
     base_colors = [
         "#2b3a8f",  # 0 entry_with_cm_cc
@@ -1252,22 +1255,23 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
         "#adb5bd",  # 14 sans_interco
         "#1B3A5C",  # 15 garde_cm_cc — marine
         "#7C2D4A",  # 16 garde_cm — bordeaux
-        "#d9480f",  # 17 demission
+        "#d9480f",  # 17 demission parlementaire
+        "#e8590c",  # 18 demission_cm — orange clair
     ]
     counts = [n_entry_cm_cc, n_entry_cm, n_entry_no_cm, n_candidat, n_non_candidat,
               n_elu, n_non_elu, n_non_reelu, n_cm_simple, n_adjoint, n_maire,
-              n_cc_simple, n_vp_cc, n_pdt_cc, n_sans_interco, n_garde_cm_cc, n_garde_cm, n_demission]
+              n_cc_simple, n_vp_cc, n_pdt_cc, n_sans_interco, n_garde_cm_cc, n_garde_cm, n_demission, n_demission_cm]
     colors = list(base_colors)
     if skip_interco:
-        x_pos = [0.001, 0.001, 0.001, 0.20, 0.20, 0.40, 0.40, 0.40, 0.65, 0.65, 0.65, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999]
+        x_pos = [0.001, 0.001, 0.001, 0.20, 0.20, 0.40, 0.40, 0.40, 0.65, 0.65, 0.65, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999, 0.999]
     else:
-        x_pos = [0.001, 0.001, 0.001, 0.15, 0.15, 0.32, 0.32, 0.32, 0.50, 0.50, 0.50, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999]
+        x_pos = [0.001, 0.001, 0.001, 0.15, 0.15, 0.32, 0.32, 0.32, 0.50, 0.50, 0.50, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999, 0.999]
     # y positions: dynamically compute so first node of each column aligns at top
     # Plotly Sankey y positions represent the vertical CENTER of the node, and
     # node height is proportional to its value relative to the total.
     # To align tops, offset y = base + (height/2), where height ~ count/max_col_total.
     total = max(sum(counts[i] for i in col if counts[i] > 0) for col in [
-        [0, 1, 2], [3, 4], [5, 6, 7], [8, 9, 10], [11, 12, 13, 14], [15, 16, 17]
+        [0, 1, 2], [3, 4], [5, 6, 7], [8, 9, 10], [11, 12, 13, 14], [15, 16, 17, 18]
     ]) or 1
     TOP_Y = 0.08  # desired top edge for first node in each column
     SPAN = 0.70   # usable vertical space (0..1 range, leave margins)
@@ -1292,13 +1296,13 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
                 positions[i] = 0.99
         return positions
 
-    columns = [[0, 1, 2], [3, 4], [5, 6, 7], [8, 9, 10], [11, 12, 13, 14], [15, 16, 17]]
+    columns = [[0, 1, 2], [3, 4], [5, 6, 7], [8, 9, 10], [11, 12, 13, 14], [15, 16, 17, 18]]
     # Extra padding for first column (3 entry nodes need more separation)
     col_extra_pad = [0.06, 0.08, 0.0, 0.0, 0.0, 0.0]
     y_map = {}
     for col, extra in zip(columns, col_extra_pad):
         y_map.update(_col_y(col, extra_pad=extra))
-    y_pos = [max(0.001, min(0.999, y_map[i])) for i in range(18)]
+    y_pos = [max(0.001, min(0.999, y_map[i])) for i in range(19)]
 
     # Build links with original 18-node indices
     raw_links: list[tuple[int, int, int, str]] = []
@@ -1331,6 +1335,7 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
             _add_link(fct_idx, 15, _sum(rows, fonction=fct, outcome="garde", exit_cm="exit_cm_cc"), "rgba(27,58,92,0.3)")
             _add_link(fct_idx, 16, _sum(rows, fonction=fct, outcome="garde", exit_cm="exit_cm"), "rgba(124,45,74,0.3)")
             _add_link(fct_idx, 17, _sum(rows, fonction=fct, outcome="demission"), "rgba(217,72,15,0.5)")
+            _add_link(fct_idx, 18, _sum(rows, fonction=fct, outcome="demission_cm"), "rgba(232,89,12,0.45)")
     else:
         # Stage 3: Fonction → Interco (3 fonctions × 4 interco = 12 links max)
         for fct, fct_idx in [("cm_simple", 8), ("adjoint", 9), ("maire", 10)]:
@@ -1339,11 +1344,12 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
             _add_link(fct_idx, 13, _sum(rows, fonction=fct, interco="pdt_cc"), "rgba(8,127,91,0.4)")
             _add_link(fct_idx, 14, _sum(rows, fonction=fct, interco="sans_interco"), "rgba(173,181,189,0.25)")
 
-        # Stage 4: Interco → Issue (4 interco × 3 outcomes = 12 links max)
+        # Stage 4: Interco → Issue (4 interco × 4 outcomes = 16 links max)
         for ico, ico_idx in [("cc_simple", 11), ("vp_cc", 12), ("pdt_cc", 13), ("sans_interco", 14)]:
             _add_link(ico_idx, 15, _sum(rows, interco=ico, outcome="garde", exit_cm="exit_cm_cc"), "rgba(27,58,92,0.3)")
             _add_link(ico_idx, 16, _sum(rows, interco=ico, outcome="garde", exit_cm="exit_cm"), "rgba(124,45,74,0.3)")
             _add_link(ico_idx, 17, _sum(rows, interco=ico, outcome="demission"), "rgba(217,72,15,0.5)")
+            _add_link(ico_idx, 18, _sum(rows, interco=ico, outcome="demission_cm"), "rgba(232,89,12,0.45)")
 
     # ── Strip empty nodes so Plotly respects x positions ──
     # Identify which nodes are used (appear in at least one link)
@@ -1465,12 +1471,13 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
             END AS interco,
             CASE
                 WHEN mvmt_parlementaire = 'Démissionnaire' THEN 'demission'
+                WHEN elu_cm = 1 AND statut_cm_2 = 'Démissionnaire' THEN 'demission_cm'
                 WHEN elu_cm = 1 THEN 'garde'
                 ELSE NULL
             END AS outcome,
             CASE
-                WHEN elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%' THEN 'exit_cm_cc'
-                WHEN elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') THEN 'exit_cm'
+                WHEN elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%' THEN 'exit_cm_cc'
+                WHEN elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') THEN 'exit_cm'
                 ELSE NULL
             END AS exit_cm,
             COUNT(*) AS value
@@ -1519,6 +1526,7 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
     n_garde_cm_cc = _sum(rows, outcome="garde", exit_cm="exit_cm_cc")
     n_garde_cm = _sum(rows, outcome="garde", exit_cm="exit_cm")
     n_demission = _sum(rows, outcome="demission")
+    n_demission_cm = _sum(rows, outcome="demission_cm")
 
     def _lc(label, count):
         return f"{label} ({count})" if count > 0 else ""
@@ -1529,7 +1537,7 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
         "elu_cm", "non_elu_cm", "non_reelu_cm",
         "cm_simple", "adjoint", "maire",
         "cc_simple", "vp_cc", "pdt_cc", "sans_interco",
-        "garde_cm_cc", "garde_cm", "demission",
+        "garde_cm_cc", "garde_cm", "demission", "demission_cm",
     ]
     labels = [
         _lc(f"{code}-CM-CC", n_entry_cm_cc),     # 0
@@ -1550,6 +1558,7 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
         _lc(f"{code}-CM-CC", n_garde_cm_cc),       # 15
         _lc(f"{code}-CM", n_garde_cm),             # 16
         _lc(f"Démission {code}", n_demission),     # 17
+        _lc("Démission CM", n_demission_cm),       # 18
     ]
     base_colors = [
         "#2b3a8f",  # 0 entry_with_cm_cc
@@ -1569,20 +1578,21 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
         "#adb5bd",  # 14 sans_interco
         "#1B3A5C",  # 15 garde_cm_cc — marine
         "#7C2D4A",  # 16 garde_cm — bordeaux
-        "#d9480f",  # 17 demission
+        "#d9480f",  # 17 demission parlementaire
+        "#e8590c",  # 18 demission_cm — orange clair
     ]
     counts = [n_entry_cm_cc, n_entry_cm, n_entry_no_cm, n_candidat, n_non_candidat,
               n_elu, n_non_elu, n_non_reelu, n_cm_simple, n_adjoint, n_maire,
-              n_cc_simple, n_vp_cc, n_pdt_cc, n_sans_interco, n_garde_cm_cc, n_garde_cm, n_demission]
+              n_cc_simple, n_vp_cc, n_pdt_cc, n_sans_interco, n_garde_cm_cc, n_garde_cm, n_demission, n_demission_cm]
     colors = list(base_colors)
     if skip_interco:
-        x_pos = [0.001, 0.001, 0.001, 0.20, 0.20, 0.40, 0.40, 0.40, 0.65, 0.65, 0.65, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999]
+        x_pos = [0.001, 0.001, 0.001, 0.20, 0.20, 0.40, 0.40, 0.40, 0.65, 0.65, 0.65, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999, 0.999]
     else:
-        x_pos = [0.001, 0.001, 0.001, 0.15, 0.15, 0.32, 0.32, 0.32, 0.50, 0.50, 0.50, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999]
+        x_pos = [0.001, 0.001, 0.001, 0.15, 0.15, 0.32, 0.32, 0.32, 0.50, 0.50, 0.50, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999, 0.999]
 
     # Dynamic y positions (same algorithm as parlementaires_detail)
     total_max = max(sum(counts[i] for i in col if counts[i] > 0) for col in [
-        [0, 1, 2], [3, 4], [5, 6, 7], [8, 9, 10], [11, 12, 13, 14], [15, 16, 17]
+        [0, 1, 2], [3, 4], [5, 6, 7], [8, 9, 10], [11, 12, 13, 14], [15, 16, 17, 18]
     ]) or 1
     TOP_Y = 0.08
     SPAN = 0.70
@@ -1604,12 +1614,12 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
                 positions[i] = 0.99
         return positions
 
-    columns = [[0, 1, 2], [3, 4], [5, 6, 7], [8, 9, 10], [11, 12, 13, 14], [15, 16, 17]]
+    columns = [[0, 1, 2], [3, 4], [5, 6, 7], [8, 9, 10], [11, 12, 13, 14], [15, 16, 17, 18]]
     col_extra_pad = [0.06, 0.08, 0.0, 0.0, 0.0, 0.0]
     y_map = {}
     for col, extra in zip(columns, col_extra_pad):
         y_map.update(_col_y(col, extra_pad=extra))
-    y_pos = [max(0.001, min(0.999, y_map[i])) for i in range(18)]
+    y_pos = [max(0.001, min(0.999, y_map[i])) for i in range(19)]
 
     # ── Build links with origin-colored flows ──
     raw_links: list[tuple[int, int, int, str]] = []
@@ -1652,6 +1662,7 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
                 _add_link(fct_idx, 15, _sum(rows, entry_cm=entry, fonction=fct, outcome="garde", exit_cm="exit_cm_cc"), color)
                 _add_link(fct_idx, 16, _sum(rows, entry_cm=entry, fonction=fct, outcome="garde", exit_cm="exit_cm"), color)
                 _add_link(fct_idx, 17, _sum(rows, entry_cm=entry, fonction=fct, outcome="demission"), color)
+                _add_link(fct_idx, 18, _sum(rows, entry_cm=entry, fonction=fct, outcome="demission_cm"), color)
         else:
             # Stage 3: Fonction → Interco
             for fct, fct_idx in [("cm_simple", 8), ("adjoint", 9), ("maire", 10)]:
@@ -1665,6 +1676,7 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
                 _add_link(ico_idx, 15, _sum(rows, entry_cm=entry, interco=ico, outcome="garde", exit_cm="exit_cm_cc"), color)
                 _add_link(ico_idx, 16, _sum(rows, entry_cm=entry, interco=ico, outcome="garde", exit_cm="exit_cm"), color)
                 _add_link(ico_idx, 17, _sum(rows, entry_cm=entry, interco=ico, outcome="demission"), color)
+                _add_link(ico_idx, 18, _sum(rows, entry_cm=entry, interco=ico, outcome="demission_cm"), color)
 
     # ── Strip empty nodes ──
     used = set()
@@ -1756,7 +1768,7 @@ def parlementaires_detail_persons(categorie: str = "depute", node: str = "entry_
         "elu_cm", "non_elu_cm", "non_reelu_cm",
         "cm_simple", "adjoint", "maire",
         "cc_simple", "vp_cc", "pdt_cc", "sans_interco",
-        "garde_cm_cc", "garde_cm", "demission",
+        "garde_cm_cc", "garde_cm", "demission", "demission_cm",
     }
     if node not in valid_nodes:
         raise ValueError(f"Nœud invalide: {node}. Utiliser: {', '.join(sorted(valid_nodes))}")
@@ -1790,9 +1802,10 @@ def parlementaires_detail_persons(categorie: str = "depute", node: str = "entry_
         "vp_cc": "elu_cm = 1 AND position_cumul_2 LIKE '%CC-VP%'",
         "pdt_cc": "elu_cm = 1 AND position_cumul_2 LIKE '%CC-P%' AND position_cumul_2 NOT LIKE '%CC-VP%'",
         "sans_interco": "elu_cm = 1 AND (position_cumul_2 NOT LIKE '%CC%' OR position_cumul_2 IS NULL)",
-        "garde_cm_cc": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%'",
-        "garde_cm": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND position_cumul_2 NOT LIKE '%CC%'",
+        "garde_cm_cc": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%'",
+        "garde_cm": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') AND position_cumul_2 NOT LIKE '%CC%'",
         "demission": "mvmt_parlementaire = 'Démissionnaire'",
+        "demission_cm": "elu_cm = 1 AND statut_cm_2 = 'Démissionnaire'",
     }
 
     # Source node filter (from link click — AND source + target conditions)
@@ -1830,7 +1843,11 @@ def parlementaires_detail_persons(categorie: str = "depute", node: str = "entry_
                 WHEN elu_cm = 1 AND position_cumul_2 LIKE '%CC%' THEN 'CC'
                 ELSE ''
             END AS interco,
-            COALESCE(mvmt_parlementaire, '') AS issue,
+            CASE
+                WHEN mvmt_parlementaire IS NOT NULL AND mvmt_parlementaire != '' THEN mvmt_parlementaire
+                WHEN statut_cm_2 = 'Démissionnaire' THEN 'Démission CM'
+                ELSE ''
+            END AS issue,
             COALESCE(nuance_parlementaire, '') AS nuance,
             COALESCE(t_departement, t_csp, '') AS departement,
             COALESCE(t_commune, '') AS commune,
@@ -1902,9 +1919,10 @@ def _build_filter_where(categorie=None, node=None, source=None, origin=None,
         "vp_cc": "elu_cm = 1 AND position_cumul_2 LIKE '%CC-VP%'",
         "pdt_cc": "elu_cm = 1 AND position_cumul_2 LIKE '%CC-P%' AND position_cumul_2 NOT LIKE '%CC-VP%'",
         "sans_interco": "elu_cm = 1 AND (position_cumul_2 NOT LIKE '%CC%' OR position_cumul_2 IS NULL)",
-        "garde_cm_cc": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%'",
-        "garde_cm": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND position_cumul_2 NOT LIKE '%CC%'",
+        "garde_cm_cc": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%'",
+        "garde_cm": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') AND position_cumul_2 NOT LIKE '%CC%'",
         "demission": "mvmt_parlementaire = 'Démissionnaire'",
+        "demission_cm": "elu_cm = 1 AND statut_cm_2 = 'Démissionnaire'",
     }
 
     clauses = ["1=1"]
@@ -2032,7 +2050,11 @@ def filtered_persons(annee: int = 20, **kwargs) -> list[dict]:
                 WHEN elu_cm = 1 AND position_cumul_2 LIKE '%CC%' THEN 'CC'
                 ELSE ''
             END AS interco,
-            COALESCE(mvmt_parlementaire, '') AS issue,
+            CASE
+                WHEN mvmt_parlementaire IS NOT NULL AND mvmt_parlementaire != '' THEN mvmt_parlementaire
+                WHEN statut_cm_2 = 'Démissionnaire' THEN 'Démission CM'
+                ELSE ''
+            END AS issue,
             COALESCE(nuance_parlementaire, '') AS nuance,
             COALESCE(t_departement, t_csp, '') AS departement,
             COALESCE(t_commune, '') AS commune,
