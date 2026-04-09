@@ -1198,10 +1198,15 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
         n_vp_cc = _sum(rows, interco="vp_cc")
         n_pdt_cc = _sum(rows, interco="pdt_cc")
         n_sans_interco = _sum(rows, interco="sans_interco")
-    n_garde_cm_cc = _sum(rows, outcome="garde", exit_cm="exit_cm_cc")
-    n_garde_cm = _sum(rows, outcome="garde", exit_cm="exit_cm")
     n_demission = _sum(rows, outcome="demission")
     n_demission_cm = _sum(rows, outcome="demission_cm")
+    if skip_interco:
+        # 2026 : on ne connaît pas les CC → fusionner garde_cm_cc dans garde_cm
+        n_garde_cm_cc = 0
+        n_garde_cm = _sum(rows, outcome="garde")
+    else:
+        n_garde_cm_cc = _sum(rows, outcome="garde", exit_cm="exit_cm_cc")
+        n_garde_cm = _sum(rows, outcome="garde", exit_cm="exit_cm")
 
     # Helper to format label with count — hide empty nodes for fixed arrangement
     def _lc(label, count):
@@ -1330,10 +1335,9 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
     _add_link(5, 10, n_maire, "rgba(47,158,68,0.4)")
 
     if skip_interco:
-        # 2026 : Fonction → Issue directement (pas d'interco)
+        # 2026 : Fonction → Issue directement (pas d'interco, pas de distinction CM-CC)
         for fct, fct_idx in [("cm_simple", 8), ("adjoint", 9), ("maire", 10)]:
-            _add_link(fct_idx, 15, _sum(rows, fonction=fct, outcome="garde", exit_cm="exit_cm_cc"), "rgba(27,58,92,0.3)")
-            _add_link(fct_idx, 16, _sum(rows, fonction=fct, outcome="garde", exit_cm="exit_cm"), "rgba(124,45,74,0.3)")
+            _add_link(fct_idx, 16, _sum(rows, fonction=fct, outcome="garde"), "rgba(124,45,74,0.3)")
             _add_link(fct_idx, 17, _sum(rows, fonction=fct, outcome="demission"), "rgba(217,72,15,0.5)")
             _add_link(fct_idx, 18, _sum(rows, fonction=fct, outcome="demission_cm"), "rgba(232,89,12,0.45)")
     else:
@@ -1523,10 +1527,14 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
         n_vp_cc = _sum(rows, interco="vp_cc")
         n_pdt_cc = _sum(rows, interco="pdt_cc")
         n_sans_interco = _sum(rows, interco="sans_interco")
-    n_garde_cm_cc = _sum(rows, outcome="garde", exit_cm="exit_cm_cc")
-    n_garde_cm = _sum(rows, outcome="garde", exit_cm="exit_cm")
     n_demission = _sum(rows, outcome="demission")
     n_demission_cm = _sum(rows, outcome="demission_cm")
+    if skip_interco:
+        n_garde_cm_cc = 0
+        n_garde_cm = _sum(rows, outcome="garde")
+    else:
+        n_garde_cm_cc = _sum(rows, outcome="garde", exit_cm="exit_cm_cc")
+        n_garde_cm = _sum(rows, outcome="garde", exit_cm="exit_cm")
 
     def _lc(label, count):
         return f"{label} ({count})" if count > 0 else ""
@@ -1657,10 +1665,9 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
         _add_link(5, 10, _sum(rows, entry_cm=entry, resultat="elu", fonction="maire"), color)
 
         if skip_interco:
-            # 2026 : Fonction → Issue directement
+            # 2026 : Fonction → Issue directement (pas de distinction CM-CC)
             for fct, fct_idx in [("cm_simple", 8), ("adjoint", 9), ("maire", 10)]:
-                _add_link(fct_idx, 15, _sum(rows, entry_cm=entry, fonction=fct, outcome="garde", exit_cm="exit_cm_cc"), color)
-                _add_link(fct_idx, 16, _sum(rows, entry_cm=entry, fonction=fct, outcome="garde", exit_cm="exit_cm"), color)
+                _add_link(fct_idx, 16, _sum(rows, entry_cm=entry, fonction=fct, outcome="garde"), color)
                 _add_link(fct_idx, 17, _sum(rows, entry_cm=entry, fonction=fct, outcome="demission"), color)
                 _add_link(fct_idx, 18, _sum(rows, entry_cm=entry, fonction=fct, outcome="demission_cm"), color)
         else:

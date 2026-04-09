@@ -320,11 +320,12 @@ function SankeyView({
     if (res !== "elu_cm") return [entry, cand, res];
     const fonc = p.fonction === "Maire" ? "maire"
                : p.fonction === "Adjoint" ? "adjoint" : "cm_simple";
+    // En 2026 : pas de distinction CM-CC en sortie (CC pas encore statué)
     const iss = p.issue === "Démissionnaire" ? "demission"
               : p.issue === "Démission CM" ? "demission_cm"
+              : annee === 26 ? "garde_cm"
               : (p.interco === "Pdt CC" || p.interco === "VP CC" || p.interco === "CC") ? "garde_cm_cc"
               : "garde_cm";
-    // En 2026 l'étape interco n'existe pas dans le Sankey → sauter
     if (annee === 26) return [entry, cand, res, fonc, iss];
     const inter = p.interco === "Pdt CC" ? "pdt_cc"
                 : p.interco === "VP CC" ? "vp_cc"
