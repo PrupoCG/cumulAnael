@@ -11,9 +11,12 @@
   "dependencies": {
     "@types/d3-sankey": "^0.12.5",
     "@visx/group": "^3.12.0",
+    "@visx/legend": "^3.12.0",
     "@visx/scale": "^3.12.0",
     "@visx/shape": "^3.12.0",
     "@visx/text": "^3.12.0",
+    "@visx/tooltip": "^3.12.0",
+    "@visx/zoom": "^3.12.0",
     "d3-sankey": "^0.12.3",
     "lucide-react": "^0.511.0",
     "next": "^16.2.0",

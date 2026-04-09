@@ -1187,10 +1187,19 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
     n_cm_simple = _sum(rows, fonction="cm_simple")
     n_adjoint = _sum(rows, fonction="adjoint")
     n_maire = _sum(rows, fonction="maire")
-    n_cc_simple = _sum(rows, interco="cc_simple")
-    n_vp_cc = _sum(rows, interco="vp_cc")
-    n_pdt_cc = _sum(rows, interco="pdt_cc")
-    n_sans_interco = _sum(rows, interco="sans_interco")
+    # En 2026, les CC n'ont pas encore statué → sauter l'étape interco
+    skip_interco = (annee == 26)
+
+    if skip_interco:
+        n_cc_simple = 0
+        n_vp_cc = 0
+        n_pdt_cc = 0
+        n_sans_interco = 0
+    else:
+        n_cc_simple = _sum(rows, interco="cc_simple")
+        n_vp_cc = _sum(rows, interco="vp_cc")
+        n_pdt_cc = _sum(rows, interco="pdt_cc")
+        n_sans_interco = _sum(rows, interco="sans_interco")
     n_garde_cm_cc = _sum(rows, outcome="garde", exit_cm="exit_cm_cc")
     n_garde_cm = _sum(rows, outcome="garde", exit_cm="exit_cm")
     n_demission = _sum(rows, outcome="demission")
@@ -1252,7 +1261,10 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
               n_elu, n_non_elu, n_non_reelu, n_cm_simple, n_adjoint, n_maire,
               n_cc_simple, n_vp_cc, n_pdt_cc, n_sans_interco, n_garde_cm_cc, n_garde_cm, n_demission]
     colors = list(base_colors)
-    x_pos = [0.001, 0.001, 0.001, 0.15, 0.15, 0.32, 0.32, 0.32, 0.50, 0.50, 0.50, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999]
+    if skip_interco:
+        x_pos = [0.001, 0.001, 0.001, 0.20, 0.20, 0.40, 0.40, 0.40, 0.65, 0.65, 0.65, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999]
+    else:
+        x_pos = [0.001, 0.001, 0.001, 0.15, 0.15, 0.32, 0.32, 0.32, 0.50, 0.50, 0.50, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999]
     # y positions: dynamically compute so first node of each column aligns at top
     # Plotly Sankey y positions represent the vertical CENTER of the node, and
     # node height is proportional to its value relative to the total.
@@ -1316,18 +1328,25 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
     _add_link(5, 9, n_adjoint, "rgba(116,184,22,0.35)")
     _add_link(5, 10, n_maire, "rgba(47,158,68,0.4)")
 
-    # Stage 3: Fonction → Interco (3 fonctions × 4 interco = 12 links max)
-    for fct, fct_idx in [("cm_simple", 8), ("adjoint", 9), ("maire", 10)]:
-        _add_link(fct_idx, 11, _sum(rows, fonction=fct, interco="cc_simple"), "rgba(12,166,120,0.3)")
-        _add_link(fct_idx, 12, _sum(rows, fonction=fct, interco="vp_cc"), "rgba(18,184,134,0.35)")
-        _add_link(fct_idx, 13, _sum(rows, fonction=fct, interco="pdt_cc"), "rgba(8,127,91,0.4)")
-        _add_link(fct_idx, 14, _sum(rows, fonction=fct, interco="sans_interco"), "rgba(173,181,189,0.25)")
+    if skip_interco:
+        # 2026 : Fonction → Issue directement (pas d'interco)
+        for fct, fct_idx in [("cm_simple", 8), ("adjoint", 9), ("maire", 10)]:
+            _add_link(fct_idx, 15, _sum(rows, fonction=fct, outcome="garde", exit_cm="exit_cm_cc"), "rgba(27,58,92,0.3)")
+            _add_link(fct_idx, 16, _sum(rows, fonction=fct, outcome="garde", exit_cm="exit_cm"), "rgba(124,45,74,0.3)")
+            _add_link(fct_idx, 17, _sum(rows, fonction=fct, outcome="demission"), "rgba(217,72,15,0.5)")
+    else:
+        # Stage 3: Fonction → Interco (3 fonctions × 4 interco = 12 links max)
+        for fct, fct_idx in [("cm_simple", 8), ("adjoint", 9), ("maire", 10)]:
+            _add_link(fct_idx, 11, _sum(rows, fonction=fct, interco="cc_simple"), "rgba(12,166,120,0.3)")
+            _add_link(fct_idx, 12, _sum(rows, fonction=fct, interco="vp_cc"), "rgba(18,184,134,0.35)")
+            _add_link(fct_idx, 13, _sum(rows, fonction=fct, interco="pdt_cc"), "rgba(8,127,91,0.4)")
+            _add_link(fct_idx, 14, _sum(rows, fonction=fct, interco="sans_interco"), "rgba(173,181,189,0.25)")
 
-    # Stage 4: Interco → Issue (4 interco × 3 outcomes = 12 links max)
-    for ico, ico_idx in [("cc_simple", 11), ("vp_cc", 12), ("pdt_cc", 13), ("sans_interco", 14)]:
-        _add_link(ico_idx, 15, _sum(rows, interco=ico, outcome="garde", exit_cm="exit_cm_cc"), "rgba(27,58,92,0.3)")
-        _add_link(ico_idx, 16, _sum(rows, interco=ico, outcome="garde", exit_cm="exit_cm"), "rgba(124,45,74,0.3)")
-        _add_link(ico_idx, 17, _sum(rows, interco=ico, outcome="demission"), "rgba(217,72,15,0.5)")
+        # Stage 4: Interco → Issue (4 interco × 3 outcomes = 12 links max)
+        for ico, ico_idx in [("cc_simple", 11), ("vp_cc", 12), ("pdt_cc", 13), ("sans_interco", 14)]:
+            _add_link(ico_idx, 15, _sum(rows, interco=ico, outcome="garde", exit_cm="exit_cm_cc"), "rgba(27,58,92,0.3)")
+            _add_link(ico_idx, 16, _sum(rows, interco=ico, outcome="garde", exit_cm="exit_cm"), "rgba(124,45,74,0.3)")
+            _add_link(ico_idx, 17, _sum(rows, interco=ico, outcome="demission"), "rgba(217,72,15,0.5)")
 
     # ── Strip empty nodes so Plotly respects x positions ──
     # Identify which nodes are used (appear in at least one link)
@@ -1351,14 +1370,26 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
     values_out = [v for _, _, v, _ in raw_links]
     link_colors = [c for _, _, _, c in raw_links]
 
-    annotations = [
-        {"x": 0, "text": "Position d'entrée"},
-        {"x": 0.15, "text": "Candidature"},
-        {"x": 0.32, "text": "Résultat"},
-        {"x": 0.50, "text": "Fonction exécutive"},
-        {"x": 0.72, "text": "Fonction interco"},
-        {"x": 1.0, "text": "Position sortie"},
-    ]
+    annee_label = "2026" if annee == 26 else "2020"
+    if skip_interco:
+        annotations = [
+            {"x": 0, "text": "Position d'entrée"},
+            {"x": 0.20, "text": "Candidature"},
+            {"x": 0.40, "text": "Résultat"},
+            {"x": 0.65, "text": "Fonction exécutive"},
+            {"x": 1.0, "text": "Position sortie"},
+        ]
+        title = f"{title_cat} — Municipales {annee_label} : position d'entrée → candidature → fonction exécutive → position sortie"
+    else:
+        annotations = [
+            {"x": 0, "text": "Position d'entrée"},
+            {"x": 0.15, "text": "Candidature"},
+            {"x": 0.32, "text": "Résultat"},
+            {"x": 0.50, "text": "Fonction exécutive"},
+            {"x": 0.72, "text": "Fonction interco"},
+            {"x": 1.0, "text": "Position sortie"},
+        ]
+        title = f"{title_cat} — Municipales {annee_label} : position d'entrée → candidature → fonction exécutive → fonction interco → position sortie"
 
     return {
         "labels": out_labels,
@@ -1369,7 +1400,7 @@ def stats_sankey_parlementaires_detail(categorie: str = "depute", annee: int = 2
         "target": targets,
         "value": values_out,
         "link_colors": link_colors,
-        "title": f"{title_cat} — Municipales 2020 : position d'entrée → candidature → fonction exécutive → fonction interco → position sortie",
+        "title": title,
         "node_keys": out_keys,
         "annotations": annotations,
     }
@@ -1475,10 +1506,19 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
     n_cm_simple = _sum(rows, fonction="cm_simple")
     n_adjoint = _sum(rows, fonction="adjoint")
     n_maire = _sum(rows, fonction="maire")
-    n_cc_simple = _sum(rows, interco="cc_simple")
-    n_vp_cc = _sum(rows, interco="vp_cc")
-    n_pdt_cc = _sum(rows, interco="pdt_cc")
-    n_sans_interco = _sum(rows, interco="sans_interco")
+    # En 2026, les CC n'ont pas encore statué → sauter l'étape interco
+    skip_interco = (annee == 26)
+
+    if skip_interco:
+        n_cc_simple = 0
+        n_vp_cc = 0
+        n_pdt_cc = 0
+        n_sans_interco = 0
+    else:
+        n_cc_simple = _sum(rows, interco="cc_simple")
+        n_vp_cc = _sum(rows, interco="vp_cc")
+        n_pdt_cc = _sum(rows, interco="pdt_cc")
+        n_sans_interco = _sum(rows, interco="sans_interco")
     n_garde_cm_cc = _sum(rows, outcome="garde", exit_cm="exit_cm_cc")
     n_garde_cm = _sum(rows, outcome="garde", exit_cm="exit_cm")
     n_demission = _sum(rows, outcome="demission")
@@ -1538,7 +1578,10 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
               n_elu, n_non_elu, n_non_reelu, n_cm_simple, n_adjoint, n_maire,
               n_cc_simple, n_vp_cc, n_pdt_cc, n_sans_interco, n_garde_cm_cc, n_garde_cm, n_demission]
     colors = list(base_colors)
-    x_pos = [0.001, 0.001, 0.001, 0.15, 0.15, 0.32, 0.32, 0.32, 0.50, 0.50, 0.50, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999]
+    if skip_interco:
+        x_pos = [0.001, 0.001, 0.001, 0.20, 0.20, 0.40, 0.40, 0.40, 0.65, 0.65, 0.65, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999]
+    else:
+        x_pos = [0.001, 0.001, 0.001, 0.15, 0.15, 0.32, 0.32, 0.32, 0.50, 0.50, 0.50, 0.72, 0.72, 0.72, 0.72, 0.999, 0.999, 0.999]
 
     # Dynamic y positions (same algorithm as parlementaires_detail)
     total_max = max(sum(counts[i] for i in col if counts[i] > 0) for col in [
@@ -1606,18 +1649,25 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
         _add_link(5, 9, _sum(rows, entry_cm=entry, resultat="elu", fonction="adjoint"), color)
         _add_link(5, 10, _sum(rows, entry_cm=entry, resultat="elu", fonction="maire"), color)
 
-        # Stage 3: Fonction → Interco
-        for fct, fct_idx in [("cm_simple", 8), ("adjoint", 9), ("maire", 10)]:
-            _add_link(fct_idx, 11, _sum(rows, entry_cm=entry, fonction=fct, interco="cc_simple"), color)
-            _add_link(fct_idx, 12, _sum(rows, entry_cm=entry, fonction=fct, interco="vp_cc"), color)
-            _add_link(fct_idx, 13, _sum(rows, entry_cm=entry, fonction=fct, interco="pdt_cc"), color)
-            _add_link(fct_idx, 14, _sum(rows, entry_cm=entry, fonction=fct, interco="sans_interco"), color)
+        if skip_interco:
+            # 2026 : Fonction → Issue directement
+            for fct, fct_idx in [("cm_simple", 8), ("adjoint", 9), ("maire", 10)]:
+                _add_link(fct_idx, 15, _sum(rows, entry_cm=entry, fonction=fct, outcome="garde", exit_cm="exit_cm_cc"), color)
+                _add_link(fct_idx, 16, _sum(rows, entry_cm=entry, fonction=fct, outcome="garde", exit_cm="exit_cm"), color)
+                _add_link(fct_idx, 17, _sum(rows, entry_cm=entry, fonction=fct, outcome="demission"), color)
+        else:
+            # Stage 3: Fonction → Interco
+            for fct, fct_idx in [("cm_simple", 8), ("adjoint", 9), ("maire", 10)]:
+                _add_link(fct_idx, 11, _sum(rows, entry_cm=entry, fonction=fct, interco="cc_simple"), color)
+                _add_link(fct_idx, 12, _sum(rows, entry_cm=entry, fonction=fct, interco="vp_cc"), color)
+                _add_link(fct_idx, 13, _sum(rows, entry_cm=entry, fonction=fct, interco="pdt_cc"), color)
+                _add_link(fct_idx, 14, _sum(rows, entry_cm=entry, fonction=fct, interco="sans_interco"), color)
 
-        # Stage 4: Interco → Sortie
-        for ico, ico_idx in [("cc_simple", 11), ("vp_cc", 12), ("pdt_cc", 13), ("sans_interco", 14)]:
-            _add_link(ico_idx, 15, _sum(rows, entry_cm=entry, interco=ico, outcome="garde", exit_cm="exit_cm_cc"), color)
-            _add_link(ico_idx, 16, _sum(rows, entry_cm=entry, interco=ico, outcome="garde", exit_cm="exit_cm"), color)
-            _add_link(ico_idx, 17, _sum(rows, entry_cm=entry, interco=ico, outcome="demission"), color)
+            # Stage 4: Interco → Sortie
+            for ico, ico_idx in [("cc_simple", 11), ("vp_cc", 12), ("pdt_cc", 13), ("sans_interco", 14)]:
+                _add_link(ico_idx, 15, _sum(rows, entry_cm=entry, interco=ico, outcome="garde", exit_cm="exit_cm_cc"), color)
+                _add_link(ico_idx, 16, _sum(rows, entry_cm=entry, interco=ico, outcome="garde", exit_cm="exit_cm"), color)
+                _add_link(ico_idx, 17, _sum(rows, entry_cm=entry, interco=ico, outcome="demission"), color)
 
     # ── Strip empty nodes ──
     used = set()
@@ -1648,14 +1698,24 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
     }
     link_origins = [_color_to_origin.get(c) for _, _, _, c in raw_links]
 
-    annotations = [
-        {"x": 0, "text": "Position d'entrée"},
-        {"x": 0.15, "text": "Candidature"},
-        {"x": 0.32, "text": "Résultat"},
-        {"x": 0.50, "text": "Fonction exécutive"},
-        {"x": 0.72, "text": "Fonction interco"},
-        {"x": 1.0, "text": "Position sortie"},
-    ]
+    annee_label = "2026" if annee == 26 else "2020"
+    if skip_interco:
+        annotations = [
+            {"x": 0, "text": "Position d'entrée"},
+            {"x": 0.20, "text": "Candidature"},
+            {"x": 0.40, "text": "Résultat"},
+            {"x": 0.65, "text": "Fonction exécutive"},
+            {"x": 1.0, "text": "Position sortie"},
+        ]
+    else:
+        annotations = [
+            {"x": 0, "text": "Position d'entrée"},
+            {"x": 0.15, "text": "Candidature"},
+            {"x": 0.32, "text": "Résultat"},
+            {"x": 0.50, "text": "Fonction exécutive"},
+            {"x": 0.72, "text": "Fonction interco"},
+            {"x": 1.0, "text": "Position sortie"},
+        ]
 
     return {
         "labels": out_labels,
@@ -1667,7 +1727,7 @@ def stats_sankey_tracabilite(categorie: str = "depute", annee: int = 20) -> dict
         "value": values_out,
         "link_colors": link_colors,
         "link_origins": link_origins,
-        "title": f"{title_cat} — Traçabilité par position d'entrée (CM-CC / CM / sans CM)",
+        "title": f"{title_cat} — Traçabilité par position d'entrée (CM-CC / CM / sans CM) — {annee_label}",
         "node_keys": out_keys,
         "annotations": annotations,
         "legend": [
