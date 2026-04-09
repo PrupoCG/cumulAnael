@@ -239,7 +239,7 @@ function SankeyView({
       });
     // Fetch stats in parallel
     setNodeStats(null);
-    fetch(`${API_URL}/api/suivi-mun/stats/filtered?categorie=${selected}&node=${nodeKey}${colorMode === "origine" && origin ? `&origin=${origin}` : ""}${sourceKey ? `&source=${sourceKey}` : ""}`)
+    fetch(`${API_URL}/api/suivi-mun/stats/filtered?annee=${annee}&categorie=${selected}&node=${nodeKey}${colorMode === "origine" && origin ? `&origin=${origin}` : ""}${sourceKey ? `&source=${sourceKey}` : ""}`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d) setNodeStats(d); })
       .catch(() => {});
@@ -315,14 +315,16 @@ function SankeyView({
     if (res !== "elu_cm") return [entry, cand, res];
     const fonc = p.fonction === "Maire" ? "maire"
                : p.fonction === "Adjoint" ? "adjoint" : "cm_simple";
-    const inter = p.interco === "Pdt CC" ? "pdt_cc"
-                : p.interco === "VP CC" ? "vp_cc"
-                : p.interco === "CC" ? "cc_simple" : "sans_interco";
     const iss = p.issue === "Démissionnaire" ? "demission"
               : (p.interco === "Pdt CC" || p.interco === "VP CC" || p.interco === "CC") ? "garde_cm_cc"
               : "garde_cm";
+    // En 2026 l'étape interco n'existe pas dans le Sankey → sauter
+    if (annee === 26) return [entry, cand, res, fonc, iss];
+    const inter = p.interco === "Pdt CC" ? "pdt_cc"
+                : p.interco === "VP CC" ? "vp_cc"
+                : p.interco === "CC" ? "cc_simple" : "sans_interco";
     return [entry, cand, res, fonc, inter, iss];
-  }, []);
+  }, [annee]);
 
   const highlightedPath = useMemo(() => {
     if (highlightedPerson === null || !filteredPersons) return undefined;
