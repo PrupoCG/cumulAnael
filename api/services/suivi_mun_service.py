@@ -587,10 +587,7 @@ def stats_sankey_parlementaires(annee: int = 20) -> dict:
         SELECT
             CASE WHEN elu_cm = 1 THEN 'Élu CM' ELSE 'Non élu' END AS elu,
             CASE
-                WHEN elu_cm = 1 AND position_cumul_2 IS NOT NULL
-                    AND position_cumul_2 NOT LIKE 'D%' AND position_cumul_2 NOT LIKE '% / D%'
-                    AND position_cumul_2 NOT LIKE 'S%' AND position_cumul_2 NOT LIKE '% / S%'
-                THEN 'Démissionnaire'
+                WHEN elu_cm = 1 AND mvmt_parlementaire = 'Démissionnaire' THEN 'Démissionnaire'
                 WHEN elu_cm = 1 THEN 'Garde mandat'
                 ELSE 'Reste sans CM'
             END AS outcome,
@@ -689,7 +686,7 @@ def stats_sankey_parlementaires(annee: int = 20) -> dict:
         "target": targets,
         "value": values,
         "link_colors": link_colors,
-        "title": "Parlementaires et municipales 2020 — Cumul & démissions",
+        "title": f"Parlementaires et municipales {'2026' if annee == 26 else '2020'} — Cumul & démissions",
     }
 
 
