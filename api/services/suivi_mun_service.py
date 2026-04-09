@@ -1791,7 +1791,8 @@ def parlementaires_detail_persons(categorie: str = "depute", node: str = "entry_
     }
     cat_where = cat_where_map[categorie]
 
-    # Node-specific filter
+    # Node-specific filter (garde_cm adapté selon l'année : en 2026 pas de distinction CC)
+    _garde_base = "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire')"
     node_filters = {
         "all": "1=1",
         "entry_with_cm_cc": "position_cumul_1 LIKE '%CM%' AND position_cumul_1 LIKE '%CC%'",
@@ -1809,8 +1810,9 @@ def parlementaires_detail_persons(categorie: str = "depute", node: str = "entry_
         "vp_cc": "elu_cm = 1 AND position_cumul_2 LIKE '%CC-VP%'",
         "pdt_cc": "elu_cm = 1 AND position_cumul_2 LIKE '%CC-P%' AND position_cumul_2 NOT LIKE '%CC-VP%'",
         "sans_interco": "elu_cm = 1 AND (position_cumul_2 NOT LIKE '%CC%' OR position_cumul_2 IS NULL)",
-        "garde_cm_cc": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%'",
-        "garde_cm": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') AND position_cumul_2 NOT LIKE '%CC%'",
+        "garde_cm_cc": f"{_garde_base} AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%'",
+        # En 2026 garde_cm = tous ceux qui gardent (CC pas encore connu)
+        "garde_cm": _garde_base if annee == 26 else f"{_garde_base} AND position_cumul_2 NOT LIKE '%CC%'",
         "demission": "mvmt_parlementaire = 'Démissionnaire'",
         "demission_cm": "elu_cm = 1 AND statut_cm_2 = 'Démissionnaire'",
     }
@@ -1900,7 +1902,7 @@ def sankey_export(mandats: str = "cm", fonctions: str = "", annee: int = 20) -> 
 
 def _build_filter_where(categorie=None, node=None, source=None, origin=None,
                          nuance=None, departement=None, civilite=None,
-                         age_min=None, age_max=None, elu=None) -> str:
+                         age_min=None, age_max=None, elu=None, annee=20) -> str:
     """Build a WHERE clause from optional filters for the filtered stats API."""
     # Category filter (same as parlementaires_detail_persons)
     cat_where_map = {
@@ -1908,7 +1910,8 @@ def _build_filter_where(categorie=None, node=None, source=None, origin=None,
         "senateur": "(position_cumul_1 LIKE 'S' OR position_cumul_1 LIKE 'S / %')",
         "rpe": "(position_cumul_1 LIKE 'RPE' OR position_cumul_1 LIKE 'RPE / %')",
     }
-    # Node filters (same as parlementaires_detail_persons)
+    # Node filters — garde_cm adapté selon l'année (en 2026 pas de distinction CC)
+    _garde_base = "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire')"
     node_filters = {
         "all": "1=1",
         "entry_with_cm_cc": "position_cumul_1 LIKE '%CM%' AND position_cumul_1 LIKE '%CC%'",
@@ -1926,8 +1929,8 @@ def _build_filter_where(categorie=None, node=None, source=None, origin=None,
         "vp_cc": "elu_cm = 1 AND position_cumul_2 LIKE '%CC-VP%'",
         "pdt_cc": "elu_cm = 1 AND position_cumul_2 LIKE '%CC-P%' AND position_cumul_2 NOT LIKE '%CC-VP%'",
         "sans_interco": "elu_cm = 1 AND (position_cumul_2 NOT LIKE '%CC%' OR position_cumul_2 IS NULL)",
-        "garde_cm_cc": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%'",
-        "garde_cm": "elu_cm = 1 AND (mvmt_parlementaire IS NULL OR mvmt_parlementaire != 'Démissionnaire') AND (statut_cm_2 IS NULL OR statut_cm_2 != 'Démissionnaire') AND position_cumul_2 NOT LIKE '%CC%'",
+        "garde_cm_cc": f"{_garde_base} AND position_cumul_2 LIKE '%CM%' AND position_cumul_2 LIKE '%CC%'",
+        "garde_cm": _garde_base if annee == 26 else f"{_garde_base} AND position_cumul_2 NOT LIKE '%CC%'",
         "demission": "mvmt_parlementaire = 'Démissionnaire'",
         "demission_cm": "elu_cm = 1 AND statut_cm_2 = 'Démissionnaire'",
     }
@@ -1973,7 +1976,7 @@ def _build_filter_where(categorie=None, node=None, source=None, origin=None,
 def filtered_stats(annee: int = 20, **kwargs) -> dict:
     """Return aggregated stats for the given filters."""
     table = _get_table(annee)
-    where = _build_filter_where(**kwargs)
+    where = _build_filter_where(annee=annee, **kwargs)
 
     total = _query(f"SELECT COUNT(*) AS total FROM {table} WHERE {where}")[0]["total"]
 
@@ -2032,7 +2035,7 @@ def filtered_stats(annee: int = 20, **kwargs) -> dict:
 def filtered_persons(annee: int = 20, **kwargs) -> list[dict]:
     """Return person-level data for the given filters."""
     table = _get_table(annee)
-    where = _build_filter_where(**kwargs)
+    where = _build_filter_where(annee=annee, **kwargs)
 
     return _query(f"""
         SELECT

@@ -71,12 +71,14 @@ function DonutChart({
   colorFn,
   width = 280,
   height = 240,
+  large = false,
 }: {
   title: string;
   data: StatEntry[];
   colorFn: (label: string) => string;
   width?: number;
   height?: number;
+  large?: boolean;
 }) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string; color: string } | null>(null);
   const [hoveredArc, setHoveredArc] = useState<number | null>(null);
@@ -97,10 +99,12 @@ function DonutChart({
     return main;
   }, [data, total]);
 
-  const radius = Math.min(width, height) / 2 - 20;
+  const w = large ? 560 : width;
+  const h = large ? 400 : height;
+  const radius = Math.min(w, h) / 2 - 20;
   const innerRadius = radius * 0.55;
-  const centerX = width / 2;
-  const centerY = height / 2;
+  const centerX = w / 2;
+  const centerY = h / 2;
 
   if (total === 0) {
     return (
@@ -115,7 +119,7 @@ function DonutChart({
     <div className="bg-slate-50/40 rounded-xl p-4" style={{ position: "relative" }}>
       <h4 className="text-[13px] font-semibold text-slate-700 mb-2">{title}</h4>
       {tooltip && <Tooltip x={tooltip.x} y={tooltip.y} color={tooltip.color}>{tooltip.text}</Tooltip>}
-      <svg width={width} height={height} style={{ display: "block", margin: "0 auto" }}>
+      <svg width={w} height={h} style={{ display: "block", margin: "0 auto" }}>
         <Group top={centerY} left={centerX}>
           <Pie
             data={chartData}
@@ -222,19 +226,23 @@ function HorizontalBarChart({
   colorFn,
   width = 280,
   height = 240,
+  large = false,
 }: {
   title: string;
   data: StatEntry[];
   colorFn?: (label: string, index: number) => string;
   width?: number;
   height?: number;
+  large?: boolean;
 }) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string; color: string } | null>(null);
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
 
+  const w = large ? 560 : width;
+  const h = large ? 400 : height;
   const margin = { top: 4, right: 40, bottom: 4, left: 70 };
-  const innerW = width - margin.left - margin.right;
-  const innerH = height - margin.top - margin.bottom;
+  const innerW = w - margin.left - margin.right;
+  const innerH = h - margin.top - margin.bottom;
 
   const total = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data]);
 
@@ -274,7 +282,7 @@ function HorizontalBarChart({
     <div className="bg-slate-50/40 rounded-xl p-4" style={{ position: "relative" }}>
       <h4 className="text-[13px] font-semibold text-slate-700 mb-2">{title}</h4>
       {tooltip && <Tooltip x={tooltip.x} y={tooltip.y} color={tooltip.color}>{tooltip.text}</Tooltip>}
-      <svg width={width} height={height} style={{ display: "block", margin: "0 auto" }}>
+      <svg width={w} height={h} style={{ display: "block", margin: "0 auto" }}>
         <Group top={margin.top} left={margin.left}>
           {data.map((d, i) => {
             const barHeight = yScale.bandwidth();
@@ -540,7 +548,41 @@ function DeptMiniMap({
 // Main StatsPanel
 // ---------------------------------------------------------------------------
 
+function ExpandButton({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="absolute top-2 right-2 z-10 w-6 h-6 flex items-center justify-center rounded-md bg-white/80 hover:bg-slate-100 border border-slate-200/60 text-slate-400 hover:text-slate-600 transition-colors"
+      title={expanded ? "Réduire" : "Agrandir"}
+    >
+      {expanded ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" /></svg>
+      )}
+    </button>
+  );
+}
+
+function ChartWrapper({ id, expanded, onExpand, onCollapse, children }: {
+  id: string;
+  expanded: string | null;
+  onExpand: (id: string) => void;
+  onCollapse: () => void;
+  children: React.ReactNode;
+}) {
+  if (expanded !== null && expanded !== id) return null;
+  return (
+    <div className="relative" style={expanded === id ? { gridColumn: "1 / -1" } : undefined}>
+      <ExpandButton expanded={expanded === id} onClick={() => expanded === id ? onCollapse() : onExpand(id)} />
+      {children}
+    </div>
+  );
+}
+
 export default function StatsPanel({ stats, title }: StatsPanelProps) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
   return (
     <div className="mt-5 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-200/30 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100/80 bg-slate-50/60">
@@ -548,25 +590,38 @@ export default function StatsPanel({ stats, title }: StatsPanelProps) {
         <p className="text-[11px] text-slate-400 mt-0.5">{stats.total} personne{stats.total > 1 ? "s" : ""}</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-        <DonutChart
-          title="Nuances politiques"
-          data={stats.nuances}
-          colorFn={nuanceColor}
-        />
-        <DonutChart
-          title="Genre"
-          data={stats.genre}
-          colorFn={(label) => GENRE_COLORS[label] ?? "#94a3b8"}
-        />
-        <DeptMiniMap
-          title="Carte des départements"
-          data={stats.departements}
-        />
-        <HorizontalBarChart
-          title="Tranches d'âge"
-          data={stats.age}
-          colorFn={(_label, i) => AGE_COLORS[i % AGE_COLORS.length]}
-        />
+        <ChartWrapper id="nuances" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
+          <DonutChart
+            title="Nuances politiques"
+            data={stats.nuances}
+            colorFn={nuanceColor}
+            large={expanded === "nuances"}
+          />
+        </ChartWrapper>
+        <ChartWrapper id="genre" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
+          <DonutChart
+            title="Genre"
+            data={stats.genre}
+            colorFn={(label) => GENRE_COLORS[label] ?? "#94a3b8"}
+            large={expanded === "genre"}
+          />
+        </ChartWrapper>
+        <ChartWrapper id="carte" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
+          <DeptMiniMap
+            title="Carte des départements"
+            data={stats.departements}
+            width={expanded === "carte" ? 560 : 280}
+            height={expanded === "carte" ? 480 : 240}
+          />
+        </ChartWrapper>
+        <ChartWrapper id="age" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
+          <HorizontalBarChart
+            title="Tranches d'âge"
+            data={stats.age}
+            colorFn={(_label, i) => AGE_COLORS[i % AGE_COLORS.length]}
+            large={expanded === "age"}
+          />
+        </ChartWrapper>
       </div>
     </div>
   );
