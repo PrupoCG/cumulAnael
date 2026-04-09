@@ -2021,10 +2021,16 @@ def filtered_stats(annee: int = 20, **kwargs) -> dict:
         FROM {table} WHERE {where}
         GROUP BY 1 ORDER BY value DESC
     """)
+    nuporec = _query(f"""
+        SELECT COALESCE(NuPoREC, 'Inconnu') AS label, COUNT(*) AS value
+        FROM {table} WHERE {where}
+        GROUP BY 1 ORDER BY value DESC
+    """)
 
     return {
         "total": total,
         "nuances": nuances,
+        "nuporec": nuporec,
         "genre": genre,
         "departements": departements,
         "age": age,

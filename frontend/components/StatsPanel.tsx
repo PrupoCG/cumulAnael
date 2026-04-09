@@ -16,6 +16,7 @@ type StatEntry = { label: string; value: number };
 export type NodeStats = {
   total: number;
   nuances: StatEntry[];
+  nuporec?: StatEntry[];
   genre: StatEntry[];
   departements: StatEntry[];
   age: StatEntry[];
@@ -580,8 +581,31 @@ function ChartWrapper({ id, expanded, onExpand, onCollapse, children }: {
   );
 }
 
+// NuPoREC color palette
+const NUPOREC_COLORS: Record<string, string> = {
+  "DROITE GOUV": "#1e40af",
+  "DivDROITE": "#3b82f6",
+  "CENTRE": "#f59e0b",
+  "GAUCHE GOUV": "#dc2626",
+  "DivGAUCHE": "#f87171",
+  "GAUCHE UNIE": "#b91c1c",
+  "AUTRE": "#6b7280",
+  "ExDROITE": "#1e3a5f",
+  "ECOLO": "#16a34a",
+  "COMMUNISTES": "#991b1b",
+  "INSOUMIS": "#c026d3",
+  "ExGAUCHE": "#9f1239",
+  "Inconnu": "#9ca3af",
+};
+function nuporecColor(label: string): string {
+  return NUPOREC_COLORS[label] ?? "#94a3b8";
+}
+
 export default function StatsPanel({ stats, title }: StatsPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [nuanceMode, setNuanceMode] = useState<"parlementaire" | "nuporec">("parlementaire");
+
+  const hasNuporec = stats.nuporec && stats.nuporec.length > 0;
 
   return (
     <div className="mt-5 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-200/30 overflow-hidden">
@@ -591,12 +615,38 @@ export default function StatsPanel({ stats, title }: StatsPanelProps) {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
         <ChartWrapper id="nuances" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
-          <DonutChart
-            title="Nuances politiques"
-            data={stats.nuances}
-            colorFn={nuanceColor}
-            large={expanded === "nuances"}
-          />
+          <div className="relative">
+            {hasNuporec && (
+              <div className="flex gap-1 mb-2">
+                <button
+                  onClick={() => setNuanceMode("parlementaire")}
+                  className={`px-2 py-0.5 text-[11px] font-medium rounded-full transition-colors ${
+                    nuanceMode === "parlementaire"
+                      ? "bg-slate-700 text-white"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  }`}
+                >
+                  Nuance parl.
+                </button>
+                <button
+                  onClick={() => setNuanceMode("nuporec")}
+                  className={`px-2 py-0.5 text-[11px] font-medium rounded-full transition-colors ${
+                    nuanceMode === "nuporec"
+                      ? "bg-slate-700 text-white"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  }`}
+                >
+                  NuPoREC
+                </button>
+              </div>
+            )}
+            <DonutChart
+              title={nuanceMode === "nuporec" ? "NuPoREC" : "Nuances politiques"}
+              data={nuanceMode === "nuporec" && stats.nuporec ? stats.nuporec : stats.nuances}
+              colorFn={nuanceMode === "nuporec" ? nuporecColor : nuanceColor}
+              large={expanded === "nuances"}
+            />
+          </div>
         </ChartWrapper>
         <ChartWrapper id="genre" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
           <DonutChart
