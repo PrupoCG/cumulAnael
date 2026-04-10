@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
+import { Pack } from "@visx/hierarchy";
+import { Group } from "@visx/group";
+import { hierarchy } from "d3-hierarchy";
 import { nuanceColor } from "@/lib/nuanceColors";
 
 // ---------------------------------------------------------------------------
@@ -18,6 +21,13 @@ export type HemicyclePerson = {
 export type HemicycleData = {
   persons: HemicyclePerson[];
   total: number;
+};
+
+type HierarchyNode = {
+  name: string;
+  children?: HierarchyNode[];
+  person?: HemicyclePerson;
+  value?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -57,72 +67,6 @@ const NUPOREC_COLORS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Seat layout computation
-// ---------------------------------------------------------------------------
-
-type Seat = { x: number; y: number; person: HemicyclePerson };
-
-function computeSeats(
-  persons: HemicyclePerson[],
-  width: number,
-  height: number,
-): Seat[] {
-  const total = persons.length;
-  if (total === 0) return [];
-
-  // Sort: NuPoREC left→right, then by nuance within group
-  const sorted = [...persons].sort((a, b) => {
-    const orderDiff = (NUPOREC_ORDER[a.nuporec] ?? 99) - (NUPOREC_ORDER[b.nuporec] ?? 99);
-    if (orderDiff !== 0) return orderDiff;
-    return a.nuance.localeCompare(b.nuance);
-  });
-
-  const cx = width / 2;
-  const cy = height - 4; // center at bottom
-
-  // Dynamically size seats based on total count
-  const seatRadius = Math.max(1.5, Math.min(4, width / (total * 0.18)));
-  const gap = seatRadius * 0.4;
-  const rowGap = seatRadius * 0.6;
-  const step = seatRadius * 2 + gap;
-  const rowStep = seatRadius * 2 + rowGap;
-
-  const rMin = width * 0.08;
-  const rMax = Math.min(width / 2 - 4, height - 8);
-
-  // Calculate how many rows fit
-  const numRows = Math.max(1, Math.floor((rMax - rMin) / rowStep) + 1);
-
-  // Round-robin: distribute persons across rows so each row
-  // has the full political spectrum (gauche à gauche, droite à droite)
-  const rowPersons: HemicyclePerson[][] = Array.from({ length: numRows }, () => []);
-  for (let i = 0; i < sorted.length; i++) {
-    rowPersons[i % numRows].push(sorted[i]);
-  }
-
-  const seats: Seat[] = [];
-  const padding = 0.05;
-
-  for (let r = 0; r < numRows; r++) {
-    const radius = rMin + r * rowStep;
-    const persons = rowPersons[r];
-    if (persons.length === 0) continue;
-
-    for (let j = 0; j < persons.length; j++) {
-      const theta =
-        persons.length === 1
-          ? Math.PI / 2
-          : Math.PI * (1 - padding) - j * (Math.PI * (1 - 2 * padding)) / (persons.length - 1);
-      const x = cx + radius * Math.cos(theta);
-      const y = cy - radius * Math.sin(theta);
-      seats.push({ x, y, person: persons[j] });
-    }
-  }
-
-  return seats;
-}
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -135,12 +79,31 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
 
   const height = Math.round(width * 0.52);
 
-  const seats = useMemo(() => computeSeats(data.persons, width, height), [data.persons, width, height]);
+  // Build hierarchy: root → NuPoREC groups → individuals
+  const root = useMemo(() => {
+    const groups = new Map<string, HemicyclePerson[]>();
+    for (const p of data.persons) {
+      const g = groups.get(p.nuporec) || [];
+      g.push(p);
+      groups.set(p.nuporec, g);
+    }
 
-  const seatRadius = useMemo(() => {
-    const total = data.persons.length;
-    return Math.max(1.5, Math.min(4, width / (total * 0.18)));
-  }, [data.persons.length, width]);
+    const children: HierarchyNode[] = Array.from(groups.entries())
+      .sort((a, b) => (NUPOREC_ORDER[a[0]] ?? 99) - (NUPOREC_ORDER[b[0]] ?? 99))
+      .map(([name, persons]) => ({
+        name,
+        children: persons.map((p) => ({
+          name: `${p.prenom} ${p.nom}`,
+          person: p,
+          value: 1,
+        })),
+      }));
+
+    const tree: HierarchyNode = { name: "root", children };
+    return hierarchy(tree)
+      .sum((d) => d.value ?? 0)
+      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+  }, [data.persons]);
 
   const handleMouseEnter = useCallback(
     (e: React.MouseEvent, person: HemicyclePerson) => {
@@ -197,24 +160,43 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
       </div>
 
       <svg width={width} height={height} style={{ display: "block", margin: "0 auto" }}>
-        {seats.map((seat, i) => {
-          const isDem = seat.person.demissionnaire === 1;
-          return (
-            <circle
-              key={i}
-              cx={seat.x}
-              cy={seat.y}
-              r={seatRadius}
-              fill={isDem ? "#dc2626" : nuanceColor(seat.person.nuance)}
-              stroke={isDem ? "#991b1b" : "rgba(255,255,255,0.3)"}
-              strokeWidth={isDem ? 1.2 : 0.3}
-              opacity={1}
-              style={{ cursor: "pointer" }}
-              onMouseEnter={(e) => handleMouseEnter(e, seat.person)}
-              onMouseLeave={handleMouseLeave}
+        <defs>
+          <clipPath id="hemicycle-clip">
+            <path
+              d={`M 0,${height} A ${width / 2},${height} 0 0,1 ${width},${height} L ${width},${height} L 0,${height} Z`}
             />
-          );
-        })}
+          </clipPath>
+        </defs>
+        <g clipPath="url(#hemicycle-clip)">
+          <Pack<HierarchyNode> root={root} size={[width, height * 2]} padding={1}>
+            {(packData) => {
+              const leaves = packData.descendants().filter((d) => !d.children);
+              return (
+                <Group top={0} left={0}>
+                  {leaves.map((node, i) => {
+                    const person = node.data.person;
+                    if (!person) return null;
+                    const isDem = person.demissionnaire === 1;
+                    return (
+                      <circle
+                        key={i}
+                        cx={node.x}
+                        cy={node.y}
+                        r={Math.max(node.r, 2)}
+                        fill={isDem ? "#dc2626" : nuanceColor(person.nuance)}
+                        stroke={isDem ? "#991b1b" : "rgba(255,255,255,0.3)"}
+                        strokeWidth={isDem ? 1.2 : 0.3}
+                        style={{ cursor: "pointer" }}
+                        onMouseEnter={(e) => handleMouseEnter(e, person)}
+                        onMouseLeave={handleMouseLeave}
+                      />
+                    );
+                  })}
+                </Group>
+              );
+            }}
+          </Pack>
+        </g>
       </svg>
 
       {/* Tooltip */}
