@@ -645,7 +645,7 @@ const DIVERGING_TOOLTIP_STYLES = {
 };
 
 const DIVERGING_W = 600;
-const DIVERGING_MARGIN = { top: 16, right: 16, bottom: 20, left: 54 };
+const DIVERGING_MARGIN = { top: 16, right: 16, bottom: 20, left: 90 };
 
 type DivergingTooltipData = {
   nuance: string;
