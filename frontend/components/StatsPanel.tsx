@@ -645,7 +645,7 @@ const DIVERGING_TOOLTIP_STYLES = {
 };
 
 const DIVERGING_W = 700;
-const DIVERGING_MARGIN = { top: 16, right: 16, bottom: 52, left: 90 };
+const DIVERGING_MARGIN = { top: 12, right: 16, bottom: 40, left: 90 };
 
 type DivergingTooltipData = {
   nuance: string;
@@ -668,7 +668,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
   const rows = mode === "nuporec" && hasNuporec ? data.nuporec! : data.nuances;
 
   const innerWidth = DIVERGING_W - DIVERGING_MARGIN.left - DIVERGING_MARGIN.right;
-  const chartHeight = Math.max(120, rows.length * 14 + DIVERGING_MARGIN.top + DIVERGING_MARGIN.bottom);
+  const chartHeight = Math.max(120, rows.length * 12 + DIVERGING_MARGIN.top + DIVERGING_MARGIN.bottom);
   const innerHeight = chartHeight - DIVERGING_MARGIN.top - DIVERGING_MARGIN.bottom;
 
   const yScale = useMemo(
