@@ -1,9 +1,6 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
-import { Pack } from "@visx/hierarchy";
-import { Group } from "@visx/group";
-import { hierarchy } from "d3-hierarchy";
 import { nuanceColor } from "@/lib/nuanceColors";
 
 // ---------------------------------------------------------------------------
@@ -21,13 +18,6 @@ export type HemicyclePerson = {
 export type HemicycleData = {
   persons: HemicyclePerson[];
   total: number;
-};
-
-type HierarchyNode = {
-  name: string;
-  children?: HierarchyNode[];
-  person?: HemicyclePerson;
-  value?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -67,6 +57,107 @@ const NUPOREC_COLORS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Seat layout computation
+// ---------------------------------------------------------------------------
+
+type Seat = { x: number; y: number; person: HemicyclePerson };
+
+function computeSeats(
+  persons: HemicyclePerson[],
+  width: number,
+  height: number,
+): Seat[] {
+  const total = persons.length;
+  if (total === 0) return [];
+
+  // Sort: NuPoREC left→right, then by nuance within group
+  const sorted = [...persons].sort((a, b) => {
+    const orderDiff = (NUPOREC_ORDER[a.nuporec] ?? 99) - (NUPOREC_ORDER[b.nuporec] ?? 99);
+    if (orderDiff !== 0) return orderDiff;
+    return a.nuance.localeCompare(b.nuance);
+  });
+
+  const cx = width / 2;
+  const cy = height - 4; // center at bottom
+
+  // Dynamically size seats based on total count
+  const seatRadius = Math.max(1.5, Math.min(4, width / (total * 0.18)));
+  const gap = seatRadius * 0.4;
+  const rowGap = seatRadius * 0.6;
+  const step = seatRadius * 2 + gap;
+  const rowStep = seatRadius * 2 + rowGap;
+
+  const rMin = width * 0.08;
+  const rMax = Math.min(width / 2 - 4, height - 8);
+
+  // Calculate how many rows we need and seats per row
+  const rows: { radius: number; capacity: number }[] = [];
+  let totalCapacity = 0;
+  let r = rMin;
+  while (r <= rMax && totalCapacity < total * 1.05) {
+    const arcLength = Math.PI * r;
+    const capacity = Math.max(1, Math.floor(arcLength / step));
+    rows.push({ radius: r, capacity });
+    totalCapacity += capacity;
+    r += rowStep;
+  }
+
+  // If not enough capacity, add more rows or increase density
+  while (totalCapacity < total) {
+    const arcLength = Math.PI * r;
+    const capacity = Math.max(1, Math.floor(arcLength / step));
+    rows.push({ radius: r, capacity });
+    totalCapacity += capacity;
+    r += rowStep;
+  }
+
+  // Distribute persons across rows proportionally
+  const seats: Seat[] = [];
+  let personIdx = 0;
+
+  for (const row of rows) {
+    if (personIdx >= total) break;
+
+    // How many seats to place in this row
+    const remaining = total - personIdx;
+    const remainingCapacity = rows
+      .slice(rows.indexOf(row))
+      .reduce((s, r2) => s + r2.capacity, 0);
+    const seatsInRow = Math.min(
+      row.capacity,
+      Math.round((row.capacity / remainingCapacity) * remaining),
+    );
+
+    if (seatsInRow <= 0) continue;
+
+    // Distribute evenly along the arc (π to 0, left to right)
+    const padding = 0.05; // small padding at edges
+    for (let i = 0; i < seatsInRow && personIdx < total; i++) {
+      const theta = Math.PI * (1 - padding) - i * (Math.PI * (1 - 2 * padding)) / Math.max(1, seatsInRow - 1);
+      const x = cx + row.radius * Math.cos(theta);
+      const y = cy - row.radius * Math.sin(theta);
+      seats.push({ x, y, person: sorted[personIdx] });
+      personIdx++;
+    }
+  }
+
+  // Safety: place any remaining persons in the last row
+  if (personIdx < total) {
+    const lastRadius = rows[rows.length - 1]?.radius ?? rMax;
+    const remaining = total - personIdx;
+    for (let i = 0; i < remaining; i++) {
+      const theta = Math.PI - i * Math.PI / Math.max(1, remaining - 1);
+      const x = cx + (lastRadius + rowStep) * Math.cos(theta);
+      const y = cy - (lastRadius + rowStep) * Math.sin(theta);
+      seats.push({ x, y, person: sorted[personIdx] });
+      personIdx++;
+    }
+  }
+
+  return seats;
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -77,33 +168,14 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
     person: HemicyclePerson;
   } | null>(null);
 
-  const height = width * 0.55;
+  const height = Math.round(width * 0.52);
 
-  // Build hierarchy: root → NuPoREC groups → individuals
-  const root = useMemo(() => {
-    const groups = new Map<string, HemicyclePerson[]>();
-    for (const p of data.persons) {
-      const g = groups.get(p.nuporec) || [];
-      g.push(p);
-      groups.set(p.nuporec, g);
-    }
+  const seats = useMemo(() => computeSeats(data.persons, width, height), [data.persons, width, height]);
 
-    const children: HierarchyNode[] = Array.from(groups.entries())
-      .sort((a, b) => (NUPOREC_ORDER[a[0]] ?? 99) - (NUPOREC_ORDER[b[0]] ?? 99))
-      .map(([name, persons]) => ({
-        name,
-        children: persons.map((p) => ({
-          name: `${p.prenom} ${p.nom}`,
-          person: p,
-          value: 1,
-        })),
-      }));
-
-    const tree: HierarchyNode = { name: "root", children };
-    return hierarchy(tree)
-      .sum((d) => d.value ?? 0)
-      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
-  }, [data.persons]);
+  const seatRadius = useMemo(() => {
+    const total = data.persons.length;
+    return Math.max(1.5, Math.min(4, width / (total * 0.18)));
+  }, [data.persons.length, width]);
 
   const handleMouseEnter = useCallback(
     (e: React.MouseEvent, person: HemicyclePerson) => {
@@ -120,13 +192,11 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
 
   const handleMouseLeave = useCallback(() => setTooltip(null), []);
 
-  // Count démissionnaires
   const nbDemissions = useMemo(
     () => data.persons.filter((p) => p.demissionnaire === 1).length,
     [data.persons],
   );
 
-  // Legend entries from actual data
   const legendEntries = useMemo(() => {
     const seen = new Map<string, number>();
     for (const p of data.persons) {
@@ -135,6 +205,10 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
     return Array.from(seen.entries())
       .sort((a, b) => (NUPOREC_ORDER[a[0]] ?? 99) - (NUPOREC_ORDER[b[0]] ?? 99));
   }, [data.persons]);
+
+  if (data.persons.length === 0) {
+    return <p className="text-[12px] text-slate-400 italic text-center">Aucune donnée</p>;
+  }
 
   return (
     <div style={{ position: "relative" }}>
@@ -158,43 +232,24 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
       </div>
 
       <svg width={width} height={height} style={{ display: "block", margin: "0 auto" }}>
-        <defs>
-          <clipPath id="hemicycle-clip">
-            <path d={`M 0,${height} A ${width / 2},${height} 0 0,1 ${width},${height} L ${width},${height} L 0,${height} Z`} />
-          </clipPath>
-        </defs>
-        <g clipPath="url(#hemicycle-clip)">
-          <Pack<HierarchyNode> root={root} size={[width, height * 2]} padding={2}>
-            {(packData) => {
-              const circles = packData.descendants().filter((d) => !d.children);
-              return (
-                <Group top={0} left={0}>
-                  {circles.map((circle, i) => {
-                    const person = circle.data.person;
-                    if (!person) return null;
-                    const fill = nuanceColor(person.nuance);
-                    const isDem = person.demissionnaire === 1;
-                    return (
-                      <circle
-                        key={i}
-                        cx={circle.x}
-                        cy={circle.y}
-                        r={Math.max(circle.r, 2.5)}
-                        fill={fill}
-                        stroke={isDem ? "#dc2626" : "rgba(255,255,255,0.4)"}
-                        strokeWidth={isDem ? 2 : 0.5}
-                        opacity={isDem ? 1 : 0.85}
-                        style={{ cursor: "pointer", transition: "opacity 0.15s" }}
-                        onMouseEnter={(e) => handleMouseEnter(e, person)}
-                        onMouseLeave={handleMouseLeave}
-                      />
-                    );
-                  })}
-                </Group>
-              );
-            }}
-          </Pack>
-        </g>
+        {seats.map((seat, i) => {
+          const isDem = seat.person.demissionnaire === 1;
+          return (
+            <circle
+              key={i}
+              cx={seat.x}
+              cy={seat.y}
+              r={seatRadius}
+              fill={nuanceColor(seat.person.nuance)}
+              stroke={isDem ? "#dc2626" : "rgba(255,255,255,0.3)"}
+              strokeWidth={isDem ? 1.5 : 0.3}
+              opacity={isDem ? 1 : 0.9}
+              style={{ cursor: "pointer" }}
+              onMouseEnter={(e) => handleMouseEnter(e, seat.person)}
+              onMouseLeave={handleMouseLeave}
+            />
+          );
+        })}
       </svg>
 
       {/* Tooltip */}
@@ -212,7 +267,7 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
             {tooltip.person.prenom} {tooltip.person.nom}
           </div>
           <div className="text-[10px] text-slate-300">
-            {tooltip.person.nuance} - {tooltip.person.nuporec}
+            {tooltip.person.nuance} — {tooltip.person.nuporec}
           </div>
           {tooltip.person.demissionnaire === 1 && (
             <div className="text-[10px] text-red-400 font-medium">Démissionnaire</div>
