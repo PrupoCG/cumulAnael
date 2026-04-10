@@ -936,7 +936,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
 
 export default function StatsPanel({ stats, title, onReset, hemicycleData }: StatsPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [view, setView] = useState<ViewKey>("hemicycle");
+  const [view, setView] = useState<ViewKey>("profil");
 
   const hasNuporec = stats.nuporec && stats.nuporec.length > 0;
 
