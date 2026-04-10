@@ -41,19 +41,19 @@ const NUPOREC_ORDER: Record<string, number> = {
 };
 
 const NUPOREC_COLORS: Record<string, string> = {
-  "DROITE GOUV": "#1e40af",
-  "DivDROITE": "#3b82f6",
-  "CENTRE": "#f59e0b",
-  "GAUCHE GOUV": "#dc2626",
-  "DivGAUCHE": "#f87171",
-  "GAUCHE UNIE": "#b91c1c",
-  "AUTRE": "#6b7280",
-  "ExDROITE": "#1e3a5f",
-  "ECOLO": "#16a34a",
-  "COMMUNISTES": "#991b1b",
-  "INSOUMIS": "#c026d3",
-  "ExGAUCHE": "#9f1239",
-  "Inconnu": "#9ca3af",
+  "DROITE GOUV": "#a3c4e0",
+  "DivDROITE": "#b8d4f0",
+  "CENTRE": "#fae0a8",
+  "GAUCHE GOUV": "#f2a8b0",
+  "DivGAUCHE": "#f5c0c6",
+  "GAUCHE UNIE": "#e8949d",
+  "AUTRE": "#c8ccd4",
+  "ExDROITE": "#5c6178",
+  "ECOLO": "#a8d8b0",
+  "COMMUNISTES": "#d4a0a6",
+  "INSOUMIS": "#d8b0e0",
+  "ExGAUCHE": "#d4a0b0",
+  "Inconnu": "#d0d5dd",
 };
 
 // ---------------------------------------------------------------------------
@@ -205,10 +205,10 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
               cx={seat.x}
               cy={seat.y}
               r={seatRadius}
-              fill={nuanceColor(seat.person.nuance)}
-              stroke={isDem ? "#dc2626" : "rgba(255,255,255,0.3)"}
-              strokeWidth={isDem ? 1.5 : 0.3}
-              opacity={isDem ? 1 : 0.9}
+              fill={isDem ? "#dc2626" : nuanceColor(seat.person.nuance)}
+              stroke={isDem ? "#991b1b" : "rgba(255,255,255,0.3)"}
+              strokeWidth={isDem ? 1.2 : 0.3}
+              opacity={1}
               style={{ cursor: "pointer" }}
               onMouseEnter={(e) => handleMouseEnter(e, seat.person)}
               onMouseLeave={handleMouseLeave}
