@@ -236,6 +236,16 @@ def _check_available():
 # Sankey routes — MUST come before /stats/{annee}/* to avoid conflicts
 # =====================================================================
 
+@router.get("/stats/hemicycle")
+def get_hemicycle(annee: int = Query(26)):
+    """Données individuelles pour visualisation hémicycle."""
+    _check_available()
+    try:
+        return svc.hemicycle_data(annee)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/stats/evolution")
 def get_stats_evolution():
     """Comparaison des cumuls entre 2020 et 2026."""

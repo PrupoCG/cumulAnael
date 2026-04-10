@@ -9,7 +9,8 @@ import { AxisBottom } from "@visx/axis";
 import { useTooltip, useTooltipInPortal, defaultStyles } from "@visx/tooltip";
 import { localPoint } from "@visx/event";
 import { NUANCE_COLORS, nuanceColor } from "@/lib/nuanceColors";
-import { Users, Palette, Target, X } from "lucide-react";
+import { Users, Palette, Target, X, Landmark } from "lucide-react";
+import HemicycleChart, { type HemicycleData } from "./HemicycleChart";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +49,7 @@ export type StatsPanelProps = {
   stats: NodeStats;
   title: string;
   onReset?: () => void;
+  hemicycleData?: HemicycleData | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -623,12 +625,13 @@ function nuporecColor(label: string): string {
   return NUPOREC_COLORS[label] ?? "#94a3b8";
 }
 
-type ViewKey = "profil" | "nuances" | "efficacite";
+type ViewKey = "profil" | "nuances" | "efficacite" | "hemicycle";
 
 const VIEW_BUTTONS: { key: ViewKey; label: string; icon: typeof Users }[] = [
   { key: "profil", label: "Profil", icon: Users },
   { key: "nuances", label: "Nuances", icon: Palette },
   { key: "efficacite", label: "Efficacité", icon: Target },
+  { key: "hemicycle", label: "Hémicycle", icon: Landmark },
 ];
 
 const DIVERGING_TOOLTIP_STYLES = {
@@ -931,9 +934,9 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
   );
 }
 
-export default function StatsPanel({ stats, title, onReset }: StatsPanelProps) {
+export default function StatsPanel({ stats, title, onReset, hemicycleData }: StatsPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [view, setView] = useState<ViewKey>("profil");
+  const [view, setView] = useState<ViewKey>("hemicycle");
 
   const hasNuporec = stats.nuporec && stats.nuporec.length > 0;
 
@@ -1041,6 +1044,19 @@ export default function StatsPanel({ stats, title, onReset }: StatsPanelProps) {
           ) : (
             <div className="bg-slate-50/40 rounded-xl p-4 flex items-center justify-center">
               <p className="text-[12px] text-slate-400 italic">Aucune donnée d'efficacité</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Vue Hémicycle */}
+      {view === "hemicycle" && (
+        <div className="p-4">
+          {hemicycleData && hemicycleData.persons.length > 0 ? (
+            <HemicycleChart data={hemicycleData} width={680} />
+          ) : (
+            <div className="bg-slate-50/40 rounded-xl p-4 flex items-center justify-center">
+              <p className="text-[12px] text-slate-400 italic">Chargement des données hémicycle…</p>
             </div>
           )}
         </div>

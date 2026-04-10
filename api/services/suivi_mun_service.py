@@ -3390,3 +3390,30 @@ def person_timeline(prenom: str, nom: str) -> dict:
             results[year] = rows[0]
     return results
 
+
+# =====================================================================
+# Hemicycle data (individual-level for circle packing)
+# =====================================================================
+
+def hemicycle_data(annee: int) -> dict:
+    """Return individual-level data for hemicycle visualization.
+
+    Each person has: nom, prenom, nuance, nuporec, demissionnaire flag.
+    Grouped by NuPoREC for circle packing layout.
+    """
+    table = _get_table(annee)
+    rows = _query(f"""
+        SELECT
+            nom_elu AS nom,
+            prenom_elu AS prenom,
+            COALESCE(nuance_parlementaire, 'Inconnu') AS nuance,
+            COALESCE(NuPoREC, 'Inconnu') AS nuporec,
+            CASE
+                WHEN mvmt_parlementaire = 'Démissionnaire' THEN 1
+                ELSE 0
+            END AS demissionnaire
+        FROM {table}
+        ORDER BY NuPoREC, nuance_parlementaire, nom_elu
+    """)
+    return {"persons": rows, "total": len(rows)}
+

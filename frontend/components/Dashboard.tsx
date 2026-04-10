@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Users, Loader2, ArrowLeft, Download, X, Search } from "lucide-react";
 import SankeyVisxChart from "./SankeyVisxChart";
 import StatsPanel, { type NodeStats } from "./StatsPanel";
+import type { HemicycleData } from "./HemicycleChart";
 import DeputePhoto from "./DeputePhoto";
 import ProfileCard from "./ProfileCard";
 
@@ -184,6 +185,7 @@ function SankeyView({
   const [searchFilter, setSearchFilter] = useState("");
   const [highlightedPerson, setHighlightedPerson] = useState<number | null>(null);
   const [nodeStats, setNodeStats] = useState<NodeStats | null>(null);
+  const [hemicycleData, setHemicycleData] = useState<HemicycleData | null>(null);
   const personsRef = useRef<HTMLDivElement>(null);
   const sankeyRef = useRef<HTMLDivElement>(null);
 
@@ -251,6 +253,7 @@ function SankeyView({
     setError(null);
     setPersons(null);
     setNodeStats(null);
+    setHemicycleData(null);
     setSelectedNode(null);
     setSelectedSource(null);
     setHighlightedPerson(null);
@@ -266,6 +269,10 @@ function SankeyView({
         fetch(`${API_URL}/api/suivi-mun/stats/filtered?annee=${annee}&categorie=${selected}`)
           .then((r) => r.ok ? r.json() : null)
           .then((s) => { if (s) setNodeStats(s); })
+          .catch(() => {});
+        fetch(`${API_URL}/api/suivi-mun/stats/hemicycle?annee=${annee}`)
+          .then((r) => r.ok ? r.json() : null)
+          .then((h) => { if (h) setHemicycleData(h); })
           .catch(() => {});
       })
       .catch((err) => {
@@ -534,6 +541,7 @@ function SankeyView({
         <StatsPanel
           stats={nodeStats}
           title={selectedNode ? `Statistiques - ${NODE_LABELS[selectedNode] || selectedNode}` : "Statistiques - Tous les parlementaires"}
+          hemicycleData={hemicycleData}
           onReset={selectedNode ? () => {
             setSelectedNode(null);
             setSelectedSource(null);
