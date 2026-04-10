@@ -14,12 +14,19 @@ import { Users, Palette, Target } from "lucide-react";
 
 type StatEntry = { label: string; value: number };
 
+type EfficaciteNuance = {
+  nuance: string;
+  candidats: number;
+  elus: number;
+  battus: number;
+  taux_election: number;
+  taux_defaite: number;
+};
+
 export type EfficaciteStats = {
-  total: number;
-  taux_candidature: number | null;
-  taux_election: number | null;
-  taux_executif: number | null;
-  taux_demission: number | null;
+  nuances: EfficaciteNuance[];
+  total_candidats: number;
+  total_elus: number;
 };
 
 export type NodeStats = {
@@ -619,20 +626,159 @@ const VIEW_BUTTONS: { key: ViewKey; label: string; icon: typeof Users }[] = [
   { key: "efficacite", label: "Efficacité", icon: Target },
 ];
 
-function GaugeCard({ label, value, color, description }: {
-  label: string; value: number | null; color: string; description: string;
-}) {
-  return (
-    <div className="bg-slate-50/40 rounded-xl border border-slate-100 p-4">
-      <p className="text-[11px] font-medium text-slate-500 mb-2">{label}</p>
-      <p className="text-[28px] font-bold" style={{ color }}>{value ?? 0}%</p>
-      <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${Math.min(value ?? 0, 100)}%`, backgroundColor: color }}
-        />
+function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string; color: string } | null>(null);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  const nuances = data.nuances;
+  const barHeight = 22;
+  const gap = 4;
+  const margin = { top: 30, right: 50, bottom: 10, left: 70 };
+  const chartWidth = 560;
+  const innerW = chartWidth - margin.left - margin.right;
+  const innerH = nuances.length * (barHeight + gap);
+  const totalH = innerH + margin.top + margin.bottom;
+  const center = innerW / 2;
+
+  const globalPct = data.total_candidats > 0
+    ? Math.round((data.total_elus / data.total_candidats) * 100)
+    : 0;
+
+  if (nuances.length === 0) {
+    return (
+      <div className="bg-slate-50/40 rounded-xl p-4">
+        <h4 className="text-[13px] font-semibold text-slate-700 mb-1">Efficacité électorale</h4>
+        <p className="text-[12px] text-slate-400 italic">Aucune donnée</p>
       </div>
-      <p className="text-[10px] text-slate-400 mt-1.5">{description}</p>
+    );
+  }
+
+  return (
+    <div className="bg-slate-50/40 rounded-xl p-4" style={{ position: "relative" }}>
+      <h4 className="text-[13px] font-semibold text-slate-700 mb-0.5">Efficacité électorale</h4>
+      <p className="text-[10px] text-slate-400 mb-3">
+        {data.total_candidats} parlementaires candidats — {data.total_elus} élus ({globalPct}% de réussite globale)
+      </p>
+      {tooltip && <Tooltip x={tooltip.x} y={tooltip.y} color={tooltip.color}>{tooltip.text}</Tooltip>}
+      <svg width={chartWidth} height={totalH} style={{ display: "block", margin: "0 auto" }}>
+        {/* Legend */}
+        <g transform={`translate(${margin.left + center}, 6)`}>
+          <circle cx={-40} cy={4} r={4} fill="#4ade80" />
+          <text x={-33} y={8} fontSize={10} fill="#64748b" fontFamily="Inter, system-ui, sans-serif">Élus</text>
+          <circle cx={10} cy={4} r={4} fill="#f87171" />
+          <text x={17} y={8} fontSize={10} fill="#64748b" fontFamily="Inter, system-ui, sans-serif">Battus</text>
+        </g>
+        {/* Center line */}
+        <line
+          x1={margin.left + center} y1={margin.top - 4}
+          x2={margin.left + center} y2={margin.top + innerH}
+          stroke="#cbd5e1" strokeWidth={1} strokeDasharray="3,3"
+        />
+        <Group top={margin.top} left={margin.left}>
+          {nuances.map((n, i) => {
+            const y = i * (barHeight + gap);
+            const elusW = (n.taux_election / 100) * center;
+            const battusW = (n.taux_defaite / 100) * center;
+            const isHovered = hoveredIdx === i;
+            const isDimmed = hoveredIdx !== null && hoveredIdx !== i;
+            return (
+              <g
+                key={n.nuance}
+                onMouseMove={(e) => {
+                  setHoveredIdx(i);
+                  const svg = e.currentTarget.closest("svg");
+                  if (!svg) return;
+                  const rect = svg.getBoundingClientRect();
+                  setTooltip({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top - 14,
+                    text: `${n.nuance}: ${n.elus} élus / ${n.battus} battus sur ${n.candidats} candidats — ${n.taux_election}% de réussite`,
+                    color: "#4ade80",
+                  });
+                }}
+                onMouseLeave={() => { setHoveredIdx(null); setTooltip(null); }}
+                style={{ cursor: "pointer", opacity: isDimmed ? 0.4 : 1, transition: "opacity 0.2s ease" }}
+              >
+                {/* Élus bar (right from center) */}
+                <rect
+                  x={center}
+                  y={y}
+                  width={elusW}
+                  height={barHeight}
+                  fill="#4ade80"
+                  rx={3}
+                  style={{ transition: "width 0.3s ease" }}
+                />
+                {/* Élus % label */}
+                {n.taux_election > 0 && (
+                  <Text
+                    x={center + elusW / 2}
+                    y={y + barHeight / 2}
+                    textAnchor="middle"
+                    verticalAnchor="middle"
+                    fill="#166534"
+                    fontSize={9}
+                    fontWeight={600}
+                    fontFamily="Inter, system-ui, sans-serif"
+                  >
+                    {`${n.taux_election}%`}
+                  </Text>
+                )}
+                {/* Battus bar (left from center) */}
+                <rect
+                  x={center - battusW}
+                  y={y}
+                  width={battusW}
+                  height={barHeight}
+                  fill="#f87171"
+                  rx={3}
+                  style={{ transition: "width 0.3s ease" }}
+                />
+                {/* Battus % label */}
+                {n.taux_defaite > 0 && (
+                  <Text
+                    x={center - battusW / 2}
+                    y={y + barHeight / 2}
+                    textAnchor="middle"
+                    verticalAnchor="middle"
+                    fill="#991b1b"
+                    fontSize={9}
+                    fontWeight={600}
+                    fontFamily="Inter, system-ui, sans-serif"
+                  >
+                    {`${n.taux_defaite}%`}
+                  </Text>
+                )}
+                {/* Nuance label (left) */}
+                <Text
+                  x={-4}
+                  y={y + barHeight / 2}
+                  textAnchor="end"
+                  verticalAnchor="middle"
+                  fill={isHovered ? "#1e293b" : nuanceColor(n.nuance) !== "#94a3b8" ? nuanceColor(n.nuance) : "#475569"}
+                  fontSize={10}
+                  fontWeight={isHovered ? 700 : 600}
+                  fontFamily="Inter, system-ui, sans-serif"
+                >
+                  {n.nuance}
+                </Text>
+                {/* Count (right) */}
+                <Text
+                  x={center + elusW + 6}
+                  y={y + barHeight / 2}
+                  textAnchor="start"
+                  verticalAnchor="middle"
+                  fill="#94a3b8"
+                  fontSize={9}
+                  fontFamily="Inter, system-ui, sans-serif"
+                >
+                  {`${n.candidats}`}
+                </Text>
+              </g>
+            );
+          })}
+        </Group>
+      </svg>
     </div>
   );
 }
@@ -732,31 +878,14 @@ export default function StatsPanel({ stats, title }: StatsPanelProps) {
 
       {/* Vue Efficacité */}
       {view === "efficacite" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-          <GaugeCard
-            label="Taux de candidature"
-            value={stats.efficacite?.taux_candidature ?? null}
-            color="#f59e0b"
-            description="Parlementaires s'étant présentés aux municipales"
-          />
-          <GaugeCard
-            label="Taux d'élection"
-            value={stats.efficacite?.taux_election ?? null}
-            color="#3b82f6"
-            description="Candidats élus au conseil municipal"
-          />
-          <GaugeCard
-            label="Taux d'accès à l'exécutif"
-            value={stats.efficacite?.taux_executif ?? null}
-            color="#10b981"
-            description="Élus devenus maire ou adjoint"
-          />
-          <GaugeCard
-            label="Taux de démission parlementaire"
-            value={stats.efficacite?.taux_demission ?? null}
-            color="#ef4444"
-            description="Parlementaires ayant démissionné de leur mandat"
-          />
+        <div className="p-4">
+          {stats.efficacite && stats.efficacite.nuances.length > 0 ? (
+            <DivergingReussiteChart data={stats.efficacite} />
+          ) : (
+            <div className="bg-slate-50/40 rounded-xl p-4 flex items-center justify-center">
+              <p className="text-[12px] text-slate-400 italic">Aucune donnée d'efficacité</p>
+            </div>
+          )}
         </div>
       )}
     </div>

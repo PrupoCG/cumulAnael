@@ -2028,16 +2028,28 @@ def filtered_stats(annee: int = 20, **kwargs) -> dict:
     """)
     efficacite_rows = _query(f"""
         SELECT
-            COUNT(*) AS total,
-            ROUND(SUM(CASE WHEN statut_candidature != '0_noncandidat' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS taux_candidature,
-            ROUND(SUM(CASE WHEN elu_cm = 1 THEN 1 ELSE 0 END) * 100.0
-                / NULLIF(SUM(CASE WHEN statut_candidature != '0_noncandidat' THEN 1 ELSE 0 END), 0), 1) AS taux_election,
-            ROUND(SUM(CASE WHEN elu_cm = 1 AND (position_cumul_2 LIKE '%%CM-M%%' OR position_cumul_2 LIKE '%%CM-A%%')
-                THEN 1 ELSE 0 END) * 100.0
-                / NULLIF(SUM(CASE WHEN elu_cm = 1 THEN 1 ELSE 0 END), 0), 1) AS taux_executif,
-            ROUND(SUM(CASE WHEN mvmt_parlementaire = 'Démissionnaire' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS taux_demission
-        FROM {table} WHERE {where}
+            COALESCE(nuance_parlementaire, 'Inconnu') AS nuance,
+            COUNT(*) AS candidats,
+            SUM(CASE WHEN elu_cm = 1 THEN 1 ELSE 0 END) AS elus,
+            SUM(CASE WHEN elu_cm = 0 THEN 1 ELSE 0 END) AS battus
+        FROM {table}
+        WHERE {where} AND statut_candidature != '0_noncandidat'
+        GROUP BY 1
+        ORDER BY (CAST(SUM(CASE WHEN elu_cm = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*)) DESC
     """)
+    efficacite_nuances = []
+    for row in efficacite_rows:
+        c = row["candidats"] or 1
+        efficacite_nuances.append({
+            "nuance": row["nuance"],
+            "candidats": c,
+            "elus": row["elus"] or 0,
+            "battus": row["battus"] or 0,
+            "taux_election": round(((row["elus"] or 0) / c) * 100, 1),
+            "taux_defaite": round(((row["battus"] or 0) / c) * 100, 1),
+        })
+    efficacite_total_candidats = sum(n["candidats"] for n in efficacite_nuances)
+    efficacite_total_elus = sum(n["elus"] for n in efficacite_nuances)
 
     return {
         "total": total,
@@ -2047,7 +2059,11 @@ def filtered_stats(annee: int = 20, **kwargs) -> dict:
         "departements": departements,
         "age": age,
         "fonctions": fonctions,
-        "efficacite": efficacite_rows[0] if efficacite_rows else {},
+        "efficacite": {
+            "nuances": efficacite_nuances,
+            "total_candidats": efficacite_total_candidats,
+            "total_elus": efficacite_total_elus,
+        },
     }
 
 
