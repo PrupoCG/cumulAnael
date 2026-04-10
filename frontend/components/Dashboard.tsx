@@ -263,6 +263,10 @@ function SankeyView({
         setData(d);
         setLoading(false);
         loadPersonsFor("all");
+        fetch(`${API_URL}/api/suivi-mun/stats/filtered?annee=${annee}&categorie=${selected}`)
+          .then((r) => r.ok ? r.json() : null)
+          .then((s) => { if (s) setNodeStats(s); })
+          .catch(() => {});
       })
       .catch((err) => {
         setError(err.message);
@@ -529,8 +533,17 @@ function SankeyView({
       {nodeStats && (
         <StatsPanel
           stats={nodeStats}
-          title={`Statistiques - ${selectedNode ? (NODE_LABELS[selectedNode] || selectedNode) : ""}`}
-          onReset={() => { setNodeStats(null); setSelectedNode(null); setSelectedSource(null); setPersons(null); setHighlightedPerson(null); }}
+          title={selectedNode ? `Statistiques - ${NODE_LABELS[selectedNode] || selectedNode}` : "Statistiques - Tous les parlementaires"}
+          onReset={selectedNode ? () => {
+            setSelectedNode(null);
+            setSelectedSource(null);
+            setPersons(null);
+            setHighlightedPerson(null);
+            fetch(`${API_URL}/api/suivi-mun/stats/filtered?annee=${annee}&categorie=${selected}`)
+              .then((r) => r.ok ? r.json() : null)
+              .then((d) => { if (d) setNodeStats(d); })
+              .catch(() => {});
+          } : undefined}
         />
       )}
 

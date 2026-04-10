@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Pie } from "@visx/shape";
 import { Group } from "@visx/group";
 import { scaleBand, scaleLinear } from "@visx/scale";
 import { Text } from "@visx/text";
+import { AxisBottom } from "@visx/axis";
+import { useTooltip, useTooltipInPortal, defaultStyles } from "@visx/tooltip";
+import { localPoint } from "@visx/event";
 import { NUANCE_COLORS, nuanceColor } from "@/lib/nuanceColors";
 import { Users, Palette, Target, X } from "lucide-react";
 
@@ -627,25 +630,87 @@ const VIEW_BUTTONS: { key: ViewKey; label: string; icon: typeof Users }[] = [
   { key: "efficacite", label: "Efficacité", icon: Target },
 ];
 
+const DIVERGING_TOOLTIP_STYLES = {
+  ...defaultStyles,
+  background: "rgba(15, 23, 42, 0.95)",
+  color: "#fff",
+  padding: "10px 14px",
+  borderRadius: "8px",
+  fontSize: "12px",
+  fontFamily: "Inter, system-ui, sans-serif",
+  lineHeight: "1.5",
+  boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+  border: "1px solid rgba(255,255,255,0.08)",
+};
+
+const DIVERGING_W = 820;
+const DIVERGING_MARGIN = { top: 30, right: 30, bottom: 50, left: 75 };
+
+type DivergingTooltipData = {
+  nuance: string;
+  candidats: number;
+  elus: number;
+  battus: number;
+  taux_election: number;
+  color: string;
+};
+
 function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string; color: string } | null>(null);
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const {
+    tooltipOpen, tooltipLeft, tooltipTop, tooltipData,
+    hideTooltip, showTooltip,
+  } = useTooltip<DivergingTooltipData>();
+  const { containerRef, TooltipInPortal } = useTooltipInPortal({ scroll: true });
 
-  const nuances = data.nuances;
-  const barHeight = 22;
-  const gap = 4;
-  const margin = { top: 30, right: 50, bottom: 10, left: 70 };
-  const chartWidth = 560;
-  const innerW = chartWidth - margin.left - margin.right;
-  const innerH = nuances.length * (barHeight + gap);
-  const totalH = innerH + margin.top + margin.bottom;
-  const center = innerW / 2;
+  const innerWidth = DIVERGING_W - DIVERGING_MARGIN.left - DIVERGING_MARGIN.right;
+  const chartHeight = Math.max(480, data.nuances.length * 24 + DIVERGING_MARGIN.top + DIVERGING_MARGIN.bottom);
+  const innerHeight = chartHeight - DIVERGING_MARGIN.top - DIVERGING_MARGIN.bottom;
 
-  const globalPct = data.total_candidats > 0
-    ? Math.round((data.total_elus / data.total_candidats) * 100)
-    : 0;
+  const yScale = useMemo(
+    () => scaleBand<string>({
+      domain: data.nuances.map((d) => d.nuance),
+      range: [0, innerHeight],
+      padding: 0.3,
+    }),
+    [data.nuances, innerHeight],
+  );
 
-  if (nuances.length === 0) {
+  const xScale = useMemo(
+    () => scaleLinear<number>({
+      domain: [-100, 100],
+      range: [0, innerWidth],
+      nice: true,
+    }),
+    [innerWidth],
+  );
+
+  const centerX = xScale(0);
+
+  const handleMouse = useCallback(
+    (e: React.MouseEvent, row: EfficaciteStats["nuances"][number]) => {
+      const coords = localPoint(e) || { x: 0, y: 0 };
+      showTooltip({
+        tooltipData: {
+          nuance: row.nuance,
+          candidats: row.candidats,
+          elus: row.elus,
+          battus: row.battus,
+          taux_election: row.taux_election,
+          color: nuanceColor(row.nuance),
+        },
+        tooltipTop: coords.y,
+        tooltipLeft: coords.x,
+      });
+    },
+    [showTooltip],
+  );
+
+  const avgTauxElection = useMemo(() => {
+    if (data.total_candidats === 0) return 0;
+    return Math.round((data.total_elus / data.total_candidats) * 100);
+  }, [data]);
+
+  if (!data.nuances.length) {
     return (
       <div className="bg-slate-50/40 rounded-xl p-4">
         <h4 className="text-[13px] font-semibold text-slate-700 mb-1">Efficacité électorale</h4>
@@ -655,131 +720,186 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
   }
 
   return (
-    <div className="bg-slate-50/40 rounded-xl p-4" style={{ position: "relative" }}>
-      <h4 className="text-[13px] font-semibold text-slate-700 mb-0.5">Efficacité électorale</h4>
-      <p className="text-[10px] text-slate-400 mb-3">
-        {data.total_candidats} parlementaires candidats — {data.total_elus} élus ({globalPct}% de réussite globale)
-      </p>
-      {tooltip && <Tooltip x={tooltip.x} y={tooltip.y} color={tooltip.color}>{tooltip.text}</Tooltip>}
-      <svg width={chartWidth} height={totalH} style={{ display: "block", margin: "0 auto" }}>
-        {/* Legend */}
-        <g transform={`translate(${margin.left + center}, 6)`}>
-          <circle cx={-40} cy={4} r={4} fill="#4ade80" />
-          <text x={-33} y={8} fontSize={10} fill="#64748b" fontFamily="Inter, system-ui, sans-serif">Élus</text>
-          <circle cx={10} cy={4} r={4} fill="#f87171" />
-          <text x={17} y={8} fontSize={10} fill="#64748b" fontFamily="Inter, system-ui, sans-serif">Battus</text>
-        </g>
-        {/* Center line */}
-        <line
-          x1={margin.left + center} y1={margin.top - 4}
-          x2={margin.left + center} y2={margin.top + innerH}
-          stroke="#cbd5e1" strokeWidth={1} strokeDasharray="3,3"
-        />
-        <Group top={margin.top} left={margin.left}>
-          {nuances.map((n, i) => {
-            const y = i * (barHeight + gap);
-            const elusW = (n.taux_election / 100) * center;
-            const battusW = (n.taux_defaite / 100) * center;
-            const isHovered = hoveredIdx === i;
-            const isDimmed = hoveredIdx !== null && hoveredIdx !== i;
-            return (
-              <g
-                key={n.nuance}
-                onMouseMove={(e) => {
-                  setHoveredIdx(i);
-                  const svg = e.currentTarget.closest("svg");
-                  if (!svg) return;
-                  const rect = svg.getBoundingClientRect();
-                  setTooltip({
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top - 14,
-                    text: `${n.nuance}: ${n.elus} élus / ${n.battus} battus sur ${n.candidats} candidats — ${n.taux_election}% de réussite`,
-                    color: "#4ade80",
-                  });
+    <div>
+      {/* Header */}
+      <div className="px-1 mb-3">
+        <h4 className="text-[15px] font-bold text-slate-800">Efficacité électorale</h4>
+        <p className="text-[11px] text-slate-400 mt-0.5">
+          {data.total_candidats} parlementaires candidats — {data.total_elus} élus ({avgTauxElection}% de réussite globale)
+        </p>
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-6 justify-center mb-2">
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-[3px]" style={{ backgroundColor: "#10b981" }} />
+          <span className="text-[11px] text-slate-600 font-medium">Élus</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-[3px]" style={{ backgroundColor: "#ef4444" }} />
+          <span className="text-[11px] text-slate-600 font-medium">Battus</span>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div ref={containerRef}>
+        <svg
+          width="100%"
+          viewBox={`0 0 ${DIVERGING_W} ${chartHeight}`}
+          style={{ fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}
+        >
+          <Group top={DIVERGING_MARGIN.top} left={DIVERGING_MARGIN.left}>
+            {/* Grid lines */}
+            {[-75, -50, -25, 25, 50, 75, 100].map((tick) => (
+              <line
+                key={`grid-${tick}`}
+                x1={xScale(tick)} x2={xScale(tick)}
+                y1={0} y2={innerHeight}
+                stroke="#f1f5f9" strokeWidth={1}
+              />
+            ))}
+
+            {/* Center line (0%) */}
+            <line
+              x1={centerX} x2={centerX}
+              y1={-10} y2={innerHeight + 5}
+              stroke="#94a3b8" strokeWidth={1.5}
+            />
+
+            {/* Bars */}
+            {data.nuances.map((row) => {
+              const barY = yScale(row.nuance) ?? 0;
+              const barH = yScale.bandwidth();
+              const elusWidth = xScale(row.taux_election) - centerX;
+              const battusWidth = centerX - xScale(-row.taux_defaite);
+
+              return (
+                <g
+                  key={row.nuance}
+                  onMouseMove={(e) => handleMouse(e, row)}
+                  onMouseLeave={hideTooltip}
+                  style={{ cursor: "pointer" }}
+                >
+                  {/* Élu bar (right, green) */}
+                  <rect
+                    x={centerX} y={barY}
+                    width={Math.max(0, elusWidth)} height={barH}
+                    fill="#10b981" rx={3} opacity={0.85}
+                  />
+                  {/* Battu bar (left, red) */}
+                  <rect
+                    x={centerX - battusWidth} y={barY}
+                    width={Math.max(0, battusWidth)} height={barH}
+                    fill="#ef4444" rx={3} opacity={0.75}
+                  />
+                  {/* Nuance label (left) */}
+                  <Text
+                    x={-8} y={barY + barH / 2}
+                    textAnchor="end" verticalAnchor="middle"
+                    fill={nuanceColor(row.nuance)}
+                    fontSize={12} fontWeight={700}
+                    fontFamily="Inter, system-ui, sans-serif"
+                  >
+                    {row.nuance}
+                  </Text>
+                  {/* % élus (white inside green bar) */}
+                  {elusWidth > 25 && (
+                    <Text
+                      x={centerX + elusWidth - 6} y={barY + barH / 2}
+                      textAnchor="end" verticalAnchor="middle"
+                      fill="#fff" fontSize={10} fontWeight={700}
+                      fontFamily="Inter, system-ui, sans-serif"
+                    >
+                      {`${row.taux_election}%`}
+                    </Text>
+                  )}
+                  {/* % battus (white inside red bar) */}
+                  {battusWidth > 25 && (
+                    <Text
+                      x={centerX - battusWidth + 6} y={barY + barH / 2}
+                      textAnchor="start" verticalAnchor="middle"
+                      fill="#fff" fontSize={10} fontWeight={600}
+                      fontFamily="Inter, system-ui, sans-serif"
+                    >
+                      {`${row.taux_defaite}%`}
+                    </Text>
+                  )}
+                  {/* Count (far right) */}
+                  <Text
+                    x={centerX + elusWidth + 6} y={barY + barH / 2}
+                    textAnchor="start" verticalAnchor="middle"
+                    fill="#94a3b8" fontSize={9}
+                    fontFamily="Inter, system-ui, sans-serif"
+                  >
+                    {`${row.candidats}`}
+                  </Text>
+                </g>
+              );
+            })}
+
+            {/* X Axis */}
+            <AxisBottom
+              top={innerHeight}
+              scale={xScale}
+              numTicks={9}
+              stroke="#cbd5e1"
+              tickStroke="#cbd5e1"
+              tickFormat={(v) => `${Math.abs(v as number)}%`}
+              tickLabelProps={() => ({
+                fill: "#64748b",
+                fontSize: 10,
+                fontFamily: "Inter, system-ui, sans-serif",
+                textAnchor: "middle" as const,
+                dy: "0.25em",
+              })}
+              hideTicks
+            />
+
+            {/* Axis annotations */}
+            <Text
+              x={centerX + innerWidth * 0.25} y={innerHeight + 38}
+              textAnchor="middle" fill="#10b981"
+              fontSize={10} fontWeight={600}
+              fontFamily="Inter, system-ui, sans-serif"
+            >
+              {"← Élus →"}
+            </Text>
+            <Text
+              x={centerX - innerWidth * 0.25} y={innerHeight + 38}
+              textAnchor="middle" fill="#ef4444"
+              fontSize={10} fontWeight={600}
+              fontFamily="Inter, system-ui, sans-serif"
+            >
+              {"← Battus →"}
+            </Text>
+          </Group>
+        </svg>
+
+        {/* Tooltip */}
+        {tooltipOpen && tooltipData && (
+          <TooltipInPortal top={tooltipTop} left={tooltipLeft} style={DIVERGING_TOOLTIP_STYLES}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+              <span
+                style={{
+                  display: "inline-block", width: 10, height: 10,
+                  borderRadius: "50%", backgroundColor: tooltipData.color, marginRight: 8,
                 }}
-                onMouseLeave={() => { setHoveredIdx(null); setTooltip(null); }}
-                style={{ cursor: "pointer", opacity: isDimmed ? 0.4 : 1, transition: "opacity 0.2s ease" }}
-              >
-                {/* Élus bar (right from center) */}
-                <rect
-                  x={center}
-                  y={y}
-                  width={elusW}
-                  height={barHeight}
-                  fill="#4ade80"
-                  rx={3}
-                  style={{ transition: "width 0.3s ease" }}
-                />
-                {/* Élus % label */}
-                {n.taux_election > 0 && (
-                  <Text
-                    x={center + elusW / 2}
-                    y={y + barHeight / 2}
-                    textAnchor="middle"
-                    verticalAnchor="middle"
-                    fill="#166534"
-                    fontSize={9}
-                    fontWeight={600}
-                    fontFamily="Inter, system-ui, sans-serif"
-                  >
-                    {`${n.taux_election}%`}
-                  </Text>
-                )}
-                {/* Battus bar (left from center) */}
-                <rect
-                  x={center - battusW}
-                  y={y}
-                  width={battusW}
-                  height={barHeight}
-                  fill="#f87171"
-                  rx={3}
-                  style={{ transition: "width 0.3s ease" }}
-                />
-                {/* Battus % label */}
-                {n.taux_defaite > 0 && (
-                  <Text
-                    x={center - battusW / 2}
-                    y={y + barHeight / 2}
-                    textAnchor="middle"
-                    verticalAnchor="middle"
-                    fill="#991b1b"
-                    fontSize={9}
-                    fontWeight={600}
-                    fontFamily="Inter, system-ui, sans-serif"
-                  >
-                    {`${n.taux_defaite}%`}
-                  </Text>
-                )}
-                {/* Nuance label (left) */}
-                <Text
-                  x={-4}
-                  y={y + barHeight / 2}
-                  textAnchor="end"
-                  verticalAnchor="middle"
-                  fill={isHovered ? "#1e293b" : nuanceColor(n.nuance) !== "#94a3b8" ? nuanceColor(n.nuance) : "#475569"}
-                  fontSize={10}
-                  fontWeight={isHovered ? 700 : 600}
-                  fontFamily="Inter, system-ui, sans-serif"
-                >
-                  {n.nuance}
-                </Text>
-                {/* Count (right) */}
-                <Text
-                  x={center + elusW + 6}
-                  y={y + barHeight / 2}
-                  textAnchor="start"
-                  verticalAnchor="middle"
-                  fill="#94a3b8"
-                  fontSize={9}
-                  fontFamily="Inter, system-ui, sans-serif"
-                >
-                  {`${n.candidats}`}
-                </Text>
-              </g>
-            );
-          })}
-        </Group>
-      </svg>
+              />
+              {tooltipData.nuance}
+            </div>
+            <div style={{ opacity: 0.85 }}>
+              <span style={{ color: "#10b981" }}>{tooltipData.elus} élus</span>
+              {" / "}
+              <span style={{ color: "#ef4444" }}>{tooltipData.battus} battus</span>
+              {" sur "}
+              {tooltipData.candidats} candidats
+            </div>
+            <div style={{ fontWeight: 700, marginTop: 4, fontSize: 13 }}>
+              {tooltipData.taux_election}% de réussite
+            </div>
+          </TooltipInPortal>
+        )}
+      </div>
     </div>
   );
 }
