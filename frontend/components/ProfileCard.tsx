@@ -82,10 +82,9 @@ function formatDate(d: string | null): string {
 // MiniTimeline – visx horizontal milestone chart
 // ---------------------------------------------------------------------------
 
-const TL_W = 440;
-const TL_H = 150;
-const TL_MARGIN = { left: 50, right: 50 };
-const NODE_R = 8;
+const TL_W = 360;
+const TL_MARGIN = { left: 55, right: 55 };
+const NODE_R = 5;
 
 const BADGE_COLORS: Record<string, { bg: string; text: string }> = {
   mandat: { bg: "#dbeafe", text: "#1d4ed8" },
@@ -121,14 +120,14 @@ function MiniTimeline({ data }: { data: TimelineData }) {
 
   const x2020 = TL_MARGIN.left;
   const x2026 = TL_W - TL_MARGIN.right;
-  const lineY = 24;
+  const lineY = 20;
 
   const badges2020 = getBadges(data["2020"]);
   const badges2026 = getBadges(data["2026"]);
   const maxBadges = Math.max(badges2020.length, badges2026.length, 1);
-  const badgeH = 16;
-  const badgeGap = 3;
-  const dynamicH = lineY + 20 + maxBadges * (badgeH + badgeGap) + 10;
+  const badgeH = 13;
+  const badgeGap = 2;
+  const dynamicH = lineY + 16 + maxBadges * (badgeH + badgeGap) + 6;
 
   return (
     <svg
@@ -140,8 +139,8 @@ function MiniTimeline({ data }: { data: TimelineData }) {
       <line
         x1={x2020} y1={lineY} x2={x2026} y2={lineY}
         stroke={has2020 && has2026 ? "#94a3b8" : "#e2e8f0"}
-        strokeWidth={2}
-        strokeDasharray={has2020 && has2026 ? undefined : "6,4"}
+        strokeWidth={1.5}
+        strokeDasharray={has2020 && has2026 ? undefined : "5,3"}
       />
 
       {/* 2020 node */}
@@ -149,13 +148,13 @@ function MiniTimeline({ data }: { data: TimelineData }) {
         <circle
           r={NODE_R}
           fill={has2020 ? (data["2020"]!.resultat === "Élu" ? "#10b981" : "#ef4444") : "#e2e8f0"}
-          stroke="#fff" strokeWidth={2}
+          stroke="#fff" strokeWidth={1.5}
         />
         <Text
-          y={-NODE_R - 6} textAnchor="middle" verticalAnchor="end"
-          fill={has2020 ? "#334155" : "#94a3b8"} fontSize={11} fontWeight={700}
+          y={-NODE_R - 4} textAnchor="middle" verticalAnchor="end"
+          fill={has2020 ? "#334155" : "#94a3b8"} fontSize={9} fontWeight={700}
         >
-          2020
+          15 mars 2020
         </Text>
       </Group>
 
@@ -164,27 +163,27 @@ function MiniTimeline({ data }: { data: TimelineData }) {
         <circle
           r={NODE_R}
           fill={has2026 ? (data["2026"]!.resultat === "Élu" ? "#10b981" : "#ef4444") : "#e2e8f0"}
-          stroke="#fff" strokeWidth={2}
+          stroke="#fff" strokeWidth={1.5}
         />
         <Text
-          y={-NODE_R - 6} textAnchor="middle" verticalAnchor="end"
-          fill={has2026 ? "#334155" : "#94a3b8"} fontSize={11} fontWeight={700}
+          y={-NODE_R - 4} textAnchor="middle" verticalAnchor="end"
+          fill={has2026 ? "#334155" : "#94a3b8"} fontSize={9} fontWeight={700}
         >
-          2026
+          15 mars 2026
         </Text>
       </Group>
 
       {/* 2020 badges */}
       {badges2020.map((b, i) => {
-        const by = lineY + NODE_R + 12 + i * (badgeH + badgeGap);
+        const by = lineY + NODE_R + 8 + i * (badgeH + badgeGap);
         const colors = BADGE_COLORS[b.type] || BADGE_COLORS.mandat;
         return (
           <g key={`2020-${i}`}>
-            <rect x={x2020 - 60} y={by} width={120} height={badgeH} rx={badgeH / 2} fill={colors.bg} />
+            <rect x={x2020 - 48} y={by} width={96} height={badgeH} rx={badgeH / 2} fill={colors.bg} />
             <text
               x={x2020} y={by + badgeH / 2 + 1}
               textAnchor="middle" dominantBaseline="middle"
-              fill={colors.text} fontSize={8} fontWeight={600}
+              fill={colors.text} fontSize={7} fontWeight={600}
             >
               {b.label}
             </text>
@@ -193,8 +192,8 @@ function MiniTimeline({ data }: { data: TimelineData }) {
       })}
       {!has2020 && (
         <text
-          x={x2020} y={lineY + NODE_R + 20}
-          textAnchor="middle" fill="#cbd5e1" fontSize={9} fontStyle="italic"
+          x={x2020} y={lineY + NODE_R + 16}
+          textAnchor="middle" fill="#cbd5e1" fontSize={8} fontStyle="italic"
         >
           Absent
         </text>
@@ -202,15 +201,15 @@ function MiniTimeline({ data }: { data: TimelineData }) {
 
       {/* 2026 badges */}
       {badges2026.map((b, i) => {
-        const by = lineY + NODE_R + 12 + i * (badgeH + badgeGap);
+        const by = lineY + NODE_R + 8 + i * (badgeH + badgeGap);
         const colors = BADGE_COLORS[b.type] || BADGE_COLORS.mandat;
         return (
           <g key={`2026-${i}`}>
-            <rect x={x2026 - 60} y={by} width={120} height={badgeH} rx={badgeH / 2} fill={colors.bg} />
+            <rect x={x2026 - 48} y={by} width={96} height={badgeH} rx={badgeH / 2} fill={colors.bg} />
             <text
               x={x2026} y={by + badgeH / 2 + 1}
               textAnchor="middle" dominantBaseline="middle"
-              fill={colors.text} fontSize={8} fontWeight={600}
+              fill={colors.text} fontSize={7} fontWeight={600}
             >
               {b.label}
             </text>
@@ -219,8 +218,8 @@ function MiniTimeline({ data }: { data: TimelineData }) {
       })}
       {!has2026 && (
         <text
-          x={x2026} y={lineY + NODE_R + 20}
-          textAnchor="middle" fill="#cbd5e1" fontSize={9} fontStyle="italic"
+          x={x2026} y={lineY + NODE_R + 16}
+          textAnchor="middle" fill="#cbd5e1" fontSize={8} fontStyle="italic"
         >
           Absent
         </text>
