@@ -537,7 +537,6 @@ function SankeyView({
           onReset={selectedNode ? () => {
             setSelectedNode(null);
             setSelectedSource(null);
-            setPersons(null);
             setHighlightedPerson(null);
             fetch(`${API_URL}/api/suivi-mun/stats/filtered?annee=${annee}&categorie=${selected}`)
               .then((r) => r.ok ? r.json() : null)

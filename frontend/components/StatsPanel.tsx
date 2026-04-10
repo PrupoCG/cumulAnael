@@ -644,7 +644,7 @@ const DIVERGING_TOOLTIP_STYLES = {
   border: "1px solid rgba(255,255,255,0.08)",
 };
 
-const DIVERGING_W = 600;
+const DIVERGING_W = 700;
 const DIVERGING_MARGIN = { top: 16, right: 16, bottom: 52, left: 90 };
 
 type DivergingTooltipData = {
@@ -668,7 +668,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
   const rows = mode === "nuporec" && hasNuporec ? data.nuporec! : data.nuances;
 
   const innerWidth = DIVERGING_W - DIVERGING_MARGIN.left - DIVERGING_MARGIN.right;
-  const chartHeight = Math.max(120, rows.length * 11 + DIVERGING_MARGIN.top + DIVERGING_MARGIN.bottom);
+  const chartHeight = Math.max(120, rows.length * 14 + DIVERGING_MARGIN.top + DIVERGING_MARGIN.bottom);
   const innerHeight = chartHeight - DIVERGING_MARGIN.top - DIVERGING_MARGIN.bottom;
 
   const yScale = useMemo(
@@ -769,7 +769,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
       </div>
 
       {/* Chart */}
-      <div ref={containerRef} className="mx-auto w-full" style={{ maxHeight: "65vh", overflow: "auto", maxWidth: "600px" }}>
+      <div ref={containerRef} className="mx-auto w-full" style={{ maxHeight: "65vh", overflow: "auto", maxWidth: "700px" }}>
         <svg
           width="100%"
           viewBox={`0 0 ${DIVERGING_W} ${chartHeight}`}
