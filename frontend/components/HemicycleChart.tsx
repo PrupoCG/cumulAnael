@@ -90,67 +90,32 @@ function computeSeats(
   const rMin = width * 0.08;
   const rMax = Math.min(width / 2 - 4, height - 8);
 
-  // Calculate how many rows we need and seats per row
-  const rows: { radius: number; capacity: number }[] = [];
-  let totalCapacity = 0;
-  let r = rMin;
-  while (r <= rMax && totalCapacity < total * 1.05) {
-    const arcLength = Math.PI * r;
-    const capacity = Math.max(1, Math.floor(arcLength / step));
-    rows.push({ radius: r, capacity });
-    totalCapacity += capacity;
-    r += rowStep;
+  // Calculate how many rows fit
+  const numRows = Math.max(1, Math.floor((rMax - rMin) / rowStep) + 1);
+
+  // Round-robin: distribute persons across rows so each row
+  // has the full political spectrum (gauche à gauche, droite à droite)
+  const rowPersons: HemicyclePerson[][] = Array.from({ length: numRows }, () => []);
+  for (let i = 0; i < sorted.length; i++) {
+    rowPersons[i % numRows].push(sorted[i]);
   }
 
-  // If not enough capacity, add more rows or increase density
-  while (totalCapacity < total) {
-    const arcLength = Math.PI * r;
-    const capacity = Math.max(1, Math.floor(arcLength / step));
-    rows.push({ radius: r, capacity });
-    totalCapacity += capacity;
-    r += rowStep;
-  }
-
-  // Distribute persons across rows proportionally
   const seats: Seat[] = [];
-  let personIdx = 0;
+  const padding = 0.05;
 
-  for (const row of rows) {
-    if (personIdx >= total) break;
+  for (let r = 0; r < numRows; r++) {
+    const radius = rMin + r * rowStep;
+    const persons = rowPersons[r];
+    if (persons.length === 0) continue;
 
-    // How many seats to place in this row
-    const remaining = total - personIdx;
-    const remainingCapacity = rows
-      .slice(rows.indexOf(row))
-      .reduce((s, r2) => s + r2.capacity, 0);
-    const seatsInRow = Math.min(
-      row.capacity,
-      Math.round((row.capacity / remainingCapacity) * remaining),
-    );
-
-    if (seatsInRow <= 0) continue;
-
-    // Distribute evenly along the arc (π to 0, left to right)
-    const padding = 0.05; // small padding at edges
-    for (let i = 0; i < seatsInRow && personIdx < total; i++) {
-      const theta = Math.PI * (1 - padding) - i * (Math.PI * (1 - 2 * padding)) / Math.max(1, seatsInRow - 1);
-      const x = cx + row.radius * Math.cos(theta);
-      const y = cy - row.radius * Math.sin(theta);
-      seats.push({ x, y, person: sorted[personIdx] });
-      personIdx++;
-    }
-  }
-
-  // Safety: place any remaining persons in the last row
-  if (personIdx < total) {
-    const lastRadius = rows[rows.length - 1]?.radius ?? rMax;
-    const remaining = total - personIdx;
-    for (let i = 0; i < remaining; i++) {
-      const theta = Math.PI - i * Math.PI / Math.max(1, remaining - 1);
-      const x = cx + (lastRadius + rowStep) * Math.cos(theta);
-      const y = cy - (lastRadius + rowStep) * Math.sin(theta);
-      seats.push({ x, y, person: sorted[personIdx] });
-      personIdx++;
+    for (let j = 0; j < persons.length; j++) {
+      const theta =
+        persons.length === 1
+          ? Math.PI / 2
+          : Math.PI * (1 - padding) - j * (Math.PI * (1 - 2 * padding)) / (persons.length - 1);
+      const x = cx + radius * Math.cos(theta);
+      const y = cy - radius * Math.sin(theta);
+      seats.push({ x, y, person: persons[j] });
     }
   }
 
