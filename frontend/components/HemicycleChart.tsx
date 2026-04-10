@@ -118,7 +118,7 @@ function computeSeats(
 
   // -- Assign angular sectors to groups ------------------------------------
   // Each group gets an angular share proportional to its size.
-  const groupGap = 0.015; // radians gap between groups (tight)
+  const groupGap = 0.02; // radians gap between groups
   const numGaps = Math.max(0, groups.length - 1);
   const usableAngle = Math.PI - groupGap * numGaps;
 
@@ -150,10 +150,12 @@ function computeSeats(
     const sectorSpan = startAngle - endAngle;
     const groupSize = gpersons.length;
 
-    // Maximum seats each row can hold within this sector (dense packing)
-    const rowCaps = radii.map((r) =>
-      Math.max(1, Math.floor((sectorSpan * r) / diameter)),
-    );
+    // Maximum seats each row can hold — use chord-based angle to avoid overlap
+    const rowCaps = radii.map((r) => {
+      if (r < diameter) return 0; // skip degenerate rows
+      const minAngle = 2 * Math.asin(seatRadius / r); // true min angular separation
+      return Math.max(0, Math.floor(sectorSpan / minAngle));
+    });
     const sectorCapacity = rowCaps.reduce((s, c) => s + c, 0);
 
     // Distribute group members across rows proportionally to each row's
@@ -170,8 +172,11 @@ function computeSeats(
     }));
     remainders.sort((a, b) => b.r - a.r);
     for (let k = 0; assigned < groupSize && k < remainders.length; k++) {
-      floorShares[remainders[k].i]++;
-      assigned++;
+      const idx = remainders[k].i;
+      if (floorShares[idx] < rowCaps[idx]) {
+        floorShares[idx]++;
+        assigned++;
+      }
     }
 
     // Place each row's seats — fill the sector edge-to-edge
@@ -181,10 +186,9 @@ function computeSeats(
       if (n <= 0) continue;
       const r = radii[ri];
 
-      // Angular step between seat centers: spread n seats across the sector
-      // with minimal margin (half a seat angular width on each side).
-      const seatAngularWidth = diameter / r;
-      const margin = seatAngularWidth * 0.5;
+      // Chord-based min angle between seat centers to prevent overlap
+      const minAngle = 2 * Math.asin(seatRadius / r);
+      const margin = minAngle * 0.5;
       const usable = sectorSpan - margin * 2;
       const step = n > 1 ? usable / (n - 1) : 0;
 
