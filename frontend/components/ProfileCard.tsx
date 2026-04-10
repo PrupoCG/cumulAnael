@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { X, Briefcase, MapPin, GraduationCap, ChevronDown } from "lucide-react";
-import { Group } from "@visx/group";
-import { Text } from "@visx/text";
 import DeputePhoto from "./DeputePhoto";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
@@ -82,9 +80,25 @@ function formatDate(d: string | null): string {
 // MiniTimeline – visx horizontal milestone chart
 // ---------------------------------------------------------------------------
 
-const TL_W = 360;
-const TL_MARGIN = { left: 55, right: 55 };
-const NODE_R = 5;
+const NODE_R = 4;
+
+// Map mandate codes to election type + approximate date by year context
+const MANDAT_ELECTIONS: Record<string, Record<string, string>> = {
+  "D":   { "2020": "Lég. juin 2017", "2026": "Lég. 2022/24" },
+  "S":   { "2020": "Sén. sept 2017", "2026": "Sén. 2020/23" },
+  "RPE": { "2020": "Eur. mai 2019",  "2026": "Eur. juin 2024" },
+  "CD":  { "2020": "Dép. mars 2015", "2026": "Dép. juin 2021" },
+  "CR":  { "2020": "Rég. déc 2015",  "2026": "Rég. juin 2021" },
+};
+
+function enrichMandatLabel(raw: string, year: string): string {
+  if (!raw) return raw;
+  const parts = raw.split(/\s*\/\s*/);
+  return parts.map(p => {
+    const info = MANDAT_ELECTIONS[p.trim()]?.[year];
+    return info ? `${p.trim()} (${info})` : p.trim();
+  }).join(" · ");
+}
 
 const BADGE_COLORS: Record<string, { bg: string; text: string }> = {
   mandat: { bg: "#dbeafe", text: "#1d4ed8" },
@@ -97,10 +111,10 @@ const BADGE_COLORS: Record<string, { bg: string; text: string }> = {
   demission_cm: { bg: "#fef3c7", text: "#b45309" },
 };
 
-function getBadges(year: TimelineYear | undefined): { label: string; type: string }[] {
+function getBadges(year: TimelineYear | undefined, yearKey: string): { label: string; type: string }[] {
   if (!year) return [];
   const badges: { label: string; type: string }[] = [];
-  if (year.mandat_national) badges.push({ label: year.mandat_national, type: "mandat" });
+  if (year.mandat_national) badges.push({ label: enrichMandatLabel(year.mandat_national, yearKey), type: "mandat" });
   if (year.candidature && year.candidature !== "Non candidat") badges.push({ label: year.candidature, type: "candidature" });
   if (year.resultat === "Élu") {
     badges.push({ label: year.fonction ? `Élu · ${year.fonction}` : "Élu", type: "elu" });
@@ -113,118 +127,59 @@ function getBadges(year: TimelineYear | undefined): { label: string; type: strin
   return badges;
 }
 
+function BadgeList({ badges, absent }: { badges: { label: string; type: string }[]; absent?: boolean }) {
+  if (absent) return <p className="text-[9px] text-slate-300 italic text-center mt-1">Absent</p>;
+  return (
+    <div className="flex flex-col items-center gap-0.5 mt-1">
+      {badges.map((b, i) => {
+        const c = BADGE_COLORS[b.type] || BADGE_COLORS.mandat;
+        return (
+          <span key={i} className="px-1.5 py-[1px] rounded-full text-[8px] font-semibold leading-tight whitespace-nowrap"
+            style={{ backgroundColor: c.bg, color: c.text }}>
+            {b.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function MiniTimeline({ data }: { data: TimelineData }) {
   const has2020 = !!data["2020"];
   const has2026 = !!data["2026"];
   if (!has2020 && !has2026) return null;
 
-  const x2020 = TL_MARGIN.left;
-  const x2026 = TL_W - TL_MARGIN.right;
-  const lineY = 20;
+  const badges2020 = getBadges(data["2020"], "2020");
+  const badges2026 = getBadges(data["2026"], "2026");
 
-  const badges2020 = getBadges(data["2020"]);
-  const badges2026 = getBadges(data["2026"]);
-  const maxBadges = Math.max(badges2020.length, badges2026.length, 1);
-  const badgeH = 13;
-  const badgeGap = 2;
-  const dynamicH = lineY + 16 + maxBadges * (badgeH + badgeGap) + 6;
+  const nodeColor = (year: TimelineYear | undefined, present: boolean) =>
+    !present ? "#e2e8f0" : year?.resultat === "Élu" ? "#10b981" : "#ef4444";
 
   return (
-    <svg
-      width="100%"
-      viewBox={`0 0 ${TL_W} ${dynamicH}`}
-      style={{ fontFamily: "Inter, system-ui, sans-serif", display: "block" }}
-    >
-      {/* Connection line */}
-      <line
-        x1={x2020} y1={lineY} x2={x2026} y2={lineY}
-        stroke={has2020 && has2026 ? "#94a3b8" : "#e2e8f0"}
-        strokeWidth={1.5}
-        strokeDasharray={has2020 && has2026 ? undefined : "5,3"}
-      />
-
-      {/* 2020 node */}
-      <Group top={lineY} left={x2020}>
-        <circle
-          r={NODE_R}
-          fill={has2020 ? (data["2020"]!.resultat === "Élu" ? "#10b981" : "#ef4444") : "#e2e8f0"}
-          stroke="#fff" strokeWidth={1.5}
-        />
-        <Text
-          y={-NODE_R - 4} textAnchor="middle" verticalAnchor="end"
-          fill={has2020 ? "#334155" : "#94a3b8"} fontSize={9} fontWeight={700}
-        >
+    <div className="flex items-start gap-2">
+      {/* 2020 column */}
+      <div className="flex-1 flex flex-col items-center min-w-0">
+        <span className={`text-[9px] font-bold mb-1 ${has2020 ? "text-slate-700" : "text-slate-300"}`}>
           15 mars 2020
-        </Text>
-      </Group>
+        </span>
+        <svg width="10" height="10"><circle cx="5" cy="5" r={NODE_R} fill={nodeColor(data["2020"], has2020)} /></svg>
+        <BadgeList badges={badges2020} absent={!has2020} />
+      </div>
 
-      {/* 2026 node */}
-      <Group top={lineY} left={x2026}>
-        <circle
-          r={NODE_R}
-          fill={has2026 ? (data["2026"]!.resultat === "Élu" ? "#10b981" : "#ef4444") : "#e2e8f0"}
-          stroke="#fff" strokeWidth={1.5}
-        />
-        <Text
-          y={-NODE_R - 4} textAnchor="middle" verticalAnchor="end"
-          fill={has2026 ? "#334155" : "#94a3b8"} fontSize={9} fontWeight={700}
-        >
+      {/* Connection line */}
+      <div className="flex items-center pt-5">
+        <div className={`w-8 border-t ${has2020 && has2026 ? "border-slate-300" : "border-dashed border-slate-200"}`} />
+      </div>
+
+      {/* 2026 column */}
+      <div className="flex-1 flex flex-col items-center min-w-0">
+        <span className={`text-[9px] font-bold mb-1 ${has2026 ? "text-slate-700" : "text-slate-300"}`}>
           15 mars 2026
-        </Text>
-      </Group>
-
-      {/* 2020 badges */}
-      {badges2020.map((b, i) => {
-        const by = lineY + NODE_R + 8 + i * (badgeH + badgeGap);
-        const colors = BADGE_COLORS[b.type] || BADGE_COLORS.mandat;
-        return (
-          <g key={`2020-${i}`}>
-            <rect x={x2020 - 48} y={by} width={96} height={badgeH} rx={badgeH / 2} fill={colors.bg} />
-            <text
-              x={x2020} y={by + badgeH / 2 + 1}
-              textAnchor="middle" dominantBaseline="middle"
-              fill={colors.text} fontSize={7} fontWeight={600}
-            >
-              {b.label}
-            </text>
-          </g>
-        );
-      })}
-      {!has2020 && (
-        <text
-          x={x2020} y={lineY + NODE_R + 16}
-          textAnchor="middle" fill="#cbd5e1" fontSize={8} fontStyle="italic"
-        >
-          Absent
-        </text>
-      )}
-
-      {/* 2026 badges */}
-      {badges2026.map((b, i) => {
-        const by = lineY + NODE_R + 8 + i * (badgeH + badgeGap);
-        const colors = BADGE_COLORS[b.type] || BADGE_COLORS.mandat;
-        return (
-          <g key={`2026-${i}`}>
-            <rect x={x2026 - 48} y={by} width={96} height={badgeH} rx={badgeH / 2} fill={colors.bg} />
-            <text
-              x={x2026} y={by + badgeH / 2 + 1}
-              textAnchor="middle" dominantBaseline="middle"
-              fill={colors.text} fontSize={7} fontWeight={600}
-            >
-              {b.label}
-            </text>
-          </g>
-        );
-      })}
-      {!has2026 && (
-        <text
-          x={x2026} y={lineY + NODE_R + 16}
-          textAnchor="middle" fill="#cbd5e1" fontSize={8} fontStyle="italic"
-        >
-          Absent
-        </text>
-      )}
-    </svg>
+        </span>
+        <svg width="10" height="10"><circle cx="5" cy="5" r={NODE_R} fill={nodeColor(data["2026"], has2026)} /></svg>
+        <BadgeList badges={badges2026} absent={!has2026} />
+      </div>
+    </div>
   );
 }
 
@@ -390,7 +345,7 @@ export default function ProfileCard({ person, onClose, annee }: ProfileCardProps
 
       {/* Timeline content */}
       {showTimeline && (
-        <div className="px-4 pb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="px-4 pb-3 animate-in fade-in slide-in-from-top-2 duration-300 max-w-[340px] mx-auto">
           {tlLoading && (
             <p className="text-[11px] text-slate-400 italic text-center py-3">Chargement…</p>
           )}
