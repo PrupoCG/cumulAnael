@@ -104,7 +104,7 @@ const MANDAT_CODE_MAP: Record<string, { election: string; detail: string; bg: st
 
 // Approximate election dates for mandates held at each municipal election
 const MANDAT_DATES: Record<string, Record<string, { date: number; label: string }>> = {
-  "D":   { "2020": { date: 201706, label: "juin 2017" },  "2026": { date: 202206, label: "juin 2022" } },
+  "D":   { "2020": { date: 201706, label: "juin 2017" },  "2026": { date: 202206, label: "2022 ou 2024" } },
   "S":   { "2020": { date: 201709, label: "sept 2017" },  "2026": { date: 202309, label: "sept 2023" } },
   "RPE": { "2020": { date: 201905, label: "mai 2019" },   "2026": { date: 202406, label: "juin 2024" } },
   "CD":  { "2020": { date: 201503, label: "mars 2015" },  "2026": { date: 202106, label: "juin 2021" } },
