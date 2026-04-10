@@ -645,7 +645,7 @@ const DIVERGING_TOOLTIP_STYLES = {
 };
 
 const DIVERGING_W = 600;
-const DIVERGING_MARGIN = { top: 16, right: 16, bottom: 20, left: 90 };
+const DIVERGING_MARGIN = { top: 16, right: 16, bottom: 32, left: 90 };
 
 type DivergingTooltipData = {
   nuance: string;
@@ -769,7 +769,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
       </div>
 
       {/* Chart */}
-      <div ref={containerRef} style={{ maxHeight: "65vh", overflow: "auto" }}>
+      <div ref={containerRef} className="mx-auto" style={{ maxHeight: "65vh", overflow: "auto", maxWidth: "600px" }}>
         <svg
           width="100%"
           viewBox={`0 0 ${DIVERGING_W} ${chartHeight}`}
