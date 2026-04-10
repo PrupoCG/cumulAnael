@@ -6,7 +6,7 @@ import { Group } from "@visx/group";
 import { scaleBand, scaleLinear } from "@visx/scale";
 import { Text } from "@visx/text";
 import { NUANCE_COLORS, nuanceColor } from "@/lib/nuanceColors";
-import { Users, Palette, Target } from "lucide-react";
+import { Users, Palette, Target, X } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,6 +43,7 @@ export type NodeStats = {
 export type StatsPanelProps = {
   stats: NodeStats;
   title: string;
+  onReset?: () => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -783,7 +784,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
   );
 }
 
-export default function StatsPanel({ stats, title }: StatsPanelProps) {
+export default function StatsPanel({ stats, title, onReset }: StatsPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [view, setView] = useState<ViewKey>("profil");
 
@@ -811,6 +812,15 @@ export default function StatsPanel({ stats, title }: StatsPanelProps) {
               {v.label}
             </button>
           ))}
+          {onReset && (
+            <button
+              onClick={onReset}
+              className="ml-1 w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-500 transition-colors"
+              title="Réinitialiser"
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
       </div>
 

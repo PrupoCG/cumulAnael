@@ -530,6 +530,7 @@ function SankeyView({
         <StatsPanel
           stats={nodeStats}
           title={`Statistiques - ${selectedNode ? (NODE_LABELS[selectedNode] || selectedNode) : ""}`}
+          onReset={() => { setNodeStats(null); setSelectedNode(null); setSelectedSource(null); setPersons(null); setHighlightedPerson(null); }}
         />
       )}
 
