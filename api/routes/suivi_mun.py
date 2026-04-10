@@ -162,7 +162,7 @@ def get_parlementaire_photo(prenom: str = Query(...), nom: str = Query(...)):
 @router.get("/person-timeline")
 def get_person_timeline(prenom: str = Query(...), nom: str = Query(...)):
     """Parcours d'une personne sur 2020 et 2026."""
-    return service.person_timeline(prenom.strip(), nom.strip())
+    return svc.person_timeline(prenom.strip(), nom.strip())
 
 
 @router.get("/bref-profile")
