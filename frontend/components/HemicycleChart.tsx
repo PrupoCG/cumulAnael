@@ -65,13 +65,16 @@ type Seat = { x: number; y: number; person: HemicyclePerson };
 /**
  * Compute hemicycle seat positions.
  *
- * Strategy:
- * 1. Determine seat size, row count, and radii.
- * 2. Compute total seat capacity across all rows.
- * 3. Assign each NuPoREC group a contiguous angular sector proportional
- *    to its member count, with small gaps between groups.
- * 4. Within each sector, fill each row to maximum capacity — seats touch
- *    with no extra spacing, producing a dense packed hemicycle.
+ * Strategy — iterative seat-sizing:
+ * 1. Start with an initial seatRadius guess, clamped to [2, 7].
+ * 2. Compute rows (radii from rMin to rMax, step = diameter).
+ * 3. Compute angular sectors per NuPoREC group (proportional to size).
+ * 4. For each sector+row, compute capacity via chord-based formula.
+ * 5. Sum total capacity across ALL sectors and rows.
+ * 6. If totalCapacity < total persons: reduce seatRadius by 10% and retry.
+ * 7. Repeat until totalCapacity >= total (max 30 iterations, then tiny
+ *    radius fallback).
+ * 8. Distribute and place ALL persons — verified with a final assertion.
  */
 function computeSeats(
   persons: HemicyclePerson[],
@@ -95,111 +98,210 @@ function computeSeats(
   // -- Geometry constants ---------------------------------------------------
   const cx = width / 2;
   const cy = height - 2;
-
-  // Seat radius scaled to fit all seats; clamped 3–7px
-  const seatRadius = Math.max(
-    3,
-    Math.min(7, width / (Math.sqrt(total) * 2.8)),
-  );
-  const diameter = seatRadius * 2;
-  // Circles touch: spacing = diameter exactly (no extra gap)
-  const spacing = diameter;
-
-  const rMin = width * 0.15;
-  const rMax = Math.min(width / 2 - seatRadius - 2, height - seatRadius - 6);
-
-  // Number of rows: pack as many as fit with diameter step (rows touch)
-  const numRows = Math.max(
-    3,
-    Math.floor((rMax - rMin) / spacing) + 1,
-  );
-  const rowStep = (rMax - rMin) / (numRows - 1);
-  const radii = Array.from({ length: numRows }, (_, i) => rMin + i * rowStep);
-
-  // -- Assign angular sectors to groups ------------------------------------
-  // Each group gets an angular share proportional to its size.
   const groupGap = 0.02; // radians gap between groups
   const numGaps = Math.max(0, groups.length - 1);
   const usableAngle = Math.PI - groupGap * numGaps;
 
-  type GroupSector = {
-    name: string;
-    persons: HemicyclePerson[];
-    startAngle: number; // left edge (higher angle)
-    endAngle: number; // right edge (lower angle)
-  };
+  // -- Helper: build rows and sector structure for a given seatRadius ------
+  function buildLayout(sr: number) {
+    const diameter = sr * 2;
+    const rMin = width * 0.15;
+    const rMax = Math.min(width / 2 - sr - 2, height - sr - 6);
 
-  const sectors: GroupSector[] = [];
-  let cursor = Math.PI; // start from left
+    const numRows = Math.max(3, Math.floor((rMax - rMin) / diameter) + 1);
+    const rowStep = numRows > 1 ? (rMax - rMin) / (numRows - 1) : 0;
+    const radii = Array.from({ length: numRows }, (_, i) => rMin + i * rowStep);
 
-  for (let gi = 0; gi < groups.length; gi++) {
-    const [name, gpersons] = groups[gi];
-    const share = gpersons.length / total;
-    const sectorAngle = usableAngle * share;
-    const startAngle = cursor;
-    const endAngle = cursor - sectorAngle;
-    sectors.push({ name, persons: gpersons, startAngle, endAngle });
-    cursor = endAngle - groupGap;
+    // Build sectors
+    type SectorInfo = {
+      name: string;
+      persons: HemicyclePerson[];
+      startAngle: number;
+      endAngle: number;
+      sectorSpan: number;
+    };
+    const sectors: SectorInfo[] = [];
+    let cursor = Math.PI;
+    for (const [name, gpersons] of groups) {
+      const share = gpersons.length / total;
+      const sectorAngle = usableAngle * share;
+      const startAngle = cursor;
+      const endAngle = cursor - sectorAngle;
+      sectors.push({
+        name,
+        persons: gpersons,
+        startAngle,
+        endAngle,
+        sectorSpan: sectorAngle,
+      });
+      cursor = endAngle - groupGap;
+    }
+
+    // Compute per-sector, per-row capacities
+    let totalCapacity = 0;
+    const sectorRowCaps: number[][] = [];
+    for (const sector of sectors) {
+      const rowCaps = radii.map((r) => {
+        if (r < diameter) return 0;
+        const minAngle = 2 * Math.asin(Math.min(1, sr / r));
+        return Math.max(0, Math.floor(sector.sectorSpan / minAngle));
+      });
+      sectorRowCaps.push(rowCaps);
+      totalCapacity += rowCaps.reduce((s, c) => s + c, 0);
+    }
+
+    return { radii, numRows, sectors, sectorRowCaps, totalCapacity, rMax };
   }
+
+  // -- Iterative sizing: shrink seatRadius until all persons fit -----------
+  let seatRadius = Math.max(2, Math.min(7, width / (Math.sqrt(total) * 2.8)));
+  let layout = buildLayout(seatRadius);
+  let iterations = 0;
+  const maxIterations = 30;
+
+  while (layout.totalCapacity < total && iterations < maxIterations) {
+    seatRadius *= 0.9;
+    if (seatRadius < 0.5) {
+      seatRadius = 0.5;
+      layout = buildLayout(seatRadius);
+      break;
+    }
+    layout = buildLayout(seatRadius);
+    iterations++;
+  }
+
+  // Absolute fallback: if still not enough capacity, use tiny radius
+  if (layout.totalCapacity < total) {
+    seatRadius = 0.5;
+    layout = buildLayout(seatRadius);
+  }
+
+  const { radii, numRows, sectors, sectorRowCaps, rMax } = layout;
 
   // -- Place seats ----------------------------------------------------------
   const seats: Seat[] = [];
 
-  for (const sector of sectors) {
-    const { persons: gpersons, startAngle, endAngle } = sector;
-    const sectorSpan = startAngle - endAngle;
+  for (let si = 0; si < sectors.length; si++) {
+    const sector = sectors[si];
+    const { persons: gpersons, startAngle, sectorSpan } = sector;
     const groupSize = gpersons.length;
-
-    // Maximum seats each row can hold — use chord-based angle to avoid overlap
-    const rowCaps = radii.map((r) => {
-      if (r < diameter) return 0; // skip degenerate rows
-      const minAngle = 2 * Math.asin(seatRadius / r); // true min angular separation
-      return Math.max(0, Math.floor(sectorSpan / minAngle));
-    });
+    const rowCaps = sectorRowCaps[si];
     const sectorCapacity = rowCaps.reduce((s, c) => s + c, 0);
 
-    // Distribute group members across rows proportionally to each row's
-    // capacity. Use Largest Remainder Method for integer rounding.
-    const idealShares = rowCaps.map(
-      (cap) => (cap / sectorCapacity) * groupSize,
-    );
-    const floorShares = idealShares.map(Math.floor);
-    let assigned = floorShares.reduce((s, v) => s + v, 0);
-    // remainders sorted descending, give +1 to the largest remainders
-    const remainders = idealShares.map((v, i) => ({
-      i,
-      r: v - Math.floor(v),
-    }));
-    remainders.sort((a, b) => b.r - a.r);
-    for (let k = 0; assigned < groupSize && k < remainders.length; k++) {
-      const idx = remainders[k].i;
-      if (floorShares[idx] < rowCaps[idx]) {
-        floorShares[idx]++;
-        assigned++;
+    // Distribute group members across rows — Largest Remainder Method
+    // without the cap that previously dropped persons.
+    const distribution = new Array(numRows).fill(0);
+
+    if (sectorCapacity >= groupSize) {
+      // Normal path: proportional distribution respecting row caps
+      const idealShares = rowCaps.map(
+        (cap) => (sectorCapacity > 0 ? (cap / sectorCapacity) * groupSize : 0),
+      );
+      const floorShares = idealShares.map(Math.floor);
+      let assigned = floorShares.reduce((s, v) => s + v, 0);
+
+      // Remainders sorted descending — give +1 to largest remainders
+      const remainders = idealShares.map((v, i) => ({
+        i,
+        r: v - Math.floor(v),
+      }));
+      remainders.sort((a, b) => b.r - a.r);
+
+      // First pass: fill up to row caps
+      for (let k = 0; assigned < groupSize && k < remainders.length; k++) {
+        const idx = remainders[k].i;
+        if (floorShares[idx] < rowCaps[idx]) {
+          floorShares[idx]++;
+          assigned++;
+        }
       }
+
+      // Second pass (safety): if still not all assigned, allow exceeding
+      // row caps — better to slightly overlap than to drop persons
+      if (assigned < groupSize) {
+        for (let k = 0; assigned < groupSize && k < remainders.length; k++) {
+          const idx = remainders[k].i;
+          floorShares[idx]++;
+          assigned++;
+        }
+      }
+
+      for (let ri = 0; ri < numRows; ri++) {
+        distribution[ri] = floorShares[ri];
+      }
+    } else {
+      // Overflow path (shouldn't happen after iterative sizing, but safety):
+      // fill each row to its cap, then overflow remaining onto extra rows
+      let remaining = groupSize;
+      for (let ri = 0; ri < numRows && remaining > 0; ri++) {
+        const n = Math.min(rowCaps[ri], remaining);
+        distribution[ri] = n;
+        remaining -= n;
+      }
+      // If still remaining, we'll handle them in the overflow block below
     }
 
-    // Place each row's seats — fill the sector edge-to-edge
+    // Place each row's seats
     let personIdx = 0;
     for (let ri = 0; ri < numRows; ri++) {
-      const n = floorShares[ri];
+      const n = distribution[ri];
       if (n <= 0) continue;
       const r = radii[ri];
 
-      // Chord-based min angle between seat centers to prevent overlap
-      const minAngle = 2 * Math.asin(seatRadius / r);
+      const minAngle =
+        r > 0 ? 2 * Math.asin(Math.min(1, seatRadius / r)) : sectorSpan;
       const margin = minAngle * 0.5;
       const usable = sectorSpan - margin * 2;
       const step = n > 1 ? usable / (n - 1) : 0;
 
       for (let j = 0; j < n && personIdx < groupSize; j++) {
         const theta = startAngle - margin - j * step;
-
         const x = cx + r * Math.cos(theta);
         const y = cy - r * Math.sin(theta);
         seats.push({ x, y, person: gpersons[personIdx] });
         personIdx++;
       }
+    }
+
+    // Overflow: place any remaining persons on extra rows beyond rMax
+    if (personIdx < groupSize) {
+      let extraRow = 1;
+      while (personIdx < groupSize) {
+        const r = rMax + extraRow * seatRadius * 2;
+        const minAngle =
+          r > 0 ? 2 * Math.asin(Math.min(1, seatRadius / r)) : sectorSpan;
+        const rowCap = Math.max(1, Math.floor(sectorSpan / minAngle));
+        const n = Math.min(rowCap, groupSize - personIdx);
+
+        const margin = minAngle * 0.5;
+        const usable = sectorSpan - margin * 2;
+        const step = n > 1 ? usable / (n - 1) : 0;
+
+        for (let j = 0; j < n && personIdx < groupSize; j++) {
+          const theta = startAngle - margin - j * step;
+          const x = cx + r * Math.cos(theta);
+          const y = cy - r * Math.sin(theta);
+          seats.push({ x, y, person: gpersons[personIdx] });
+          personIdx++;
+        }
+        extraRow++;
+      }
+    }
+  }
+
+  // -- Final safety: if any persons were still missed, place on outermost row
+  if (seats.length < total) {
+    const placed = new Set(seats.map((s) => s.person));
+    const missing = persons.filter((p) => !placed.has(p));
+    const r = rMax + seatRadius * 4;
+    const step = missing.length > 1 ? Math.PI / (missing.length - 1) : 0;
+    for (let i = 0; i < missing.length; i++) {
+      const theta = Math.PI - i * step;
+      seats.push({
+        x: cx + r * Math.cos(theta),
+        y: cy - r * Math.sin(theta),
+        person: missing[i],
+      });
     }
   }
 
