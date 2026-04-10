@@ -178,25 +178,25 @@ function MiniTimeline({ data }: { data: TimelineData }) {
   return (
     <div className="relative">
       {/* Horizontal line behind dots */}
-      <div className="absolute left-0 right-0 top-[6px] h-px bg-slate-200" />
+      <div className="absolute left-0 right-0 top-[7px] h-px bg-slate-200" />
 
       {/* Events */}
-      <div className="relative flex justify-between gap-1">
+      <div className="relative flex justify-between gap-2">
         {events.map((ev, i) => (
           <div key={i} className="flex flex-col items-center min-w-0 flex-1">
             {/* Dot */}
-            <div className="w-3 h-3 rounded-full border-2 border-white z-10 flex-shrink-0"
+            <div className="w-3.5 h-3.5 rounded-full border-2 border-white z-10 flex-shrink-0"
               style={{ backgroundColor: ev.color }} />
             {/* Date */}
-            <span className="text-[7px] font-bold text-slate-500 mt-1 whitespace-nowrap">{ev.dateLabel}</span>
+            <span className="text-[9px] font-bold text-slate-500 mt-1 whitespace-nowrap">{ev.dateLabel}</span>
             {/* Election type */}
-            <span className="text-[7px] font-semibold mt-0.5 whitespace-nowrap" style={{ color: ev.fg }}>
+            <span className="text-[9px] font-semibold mt-0.5 whitespace-nowrap" style={{ color: ev.fg }}>
               {ev.election}
             </span>
             {/* Detail badges */}
-            <div className="flex flex-col items-center gap-[1px] mt-0.5">
+            <div className="flex flex-col items-center gap-[2px] mt-0.5">
               {ev.details.map((d, j) => (
-                <span key={j} className="px-1 py-[0.5px] rounded-full text-[6.5px] font-medium leading-tight whitespace-nowrap"
+                <span key={j} className="px-1.5 py-[1px] rounded-full text-[8px] font-medium leading-tight whitespace-nowrap"
                   style={{ backgroundColor: ev.bg, color: ev.fg }}>
                   {d}
                 </span>
