@@ -3343,3 +3343,50 @@ def stats_circle_pack_cumuls(annee: int = 20) -> dict:
         "total": grand_total,
     }
 
+
+# =====================================================================
+# Person Timeline (cross-year lookup)
+# =====================================================================
+
+def person_timeline(prenom: str, nom: str) -> dict:
+    """Return a person's trajectory across 2020 and 2026 municipal elections."""
+    sql_tpl = """
+        SELECT
+            COALESCE(position_cumul_1, '') AS mandat_national,
+            CASE
+                WHEN statut_candidature = '2_tetedeliste' THEN 'Tête de liste'
+                WHEN statut_candidature = '1_candidat' THEN 'Candidat'
+                ELSE 'Non candidat'
+            END AS candidature,
+            CASE WHEN elu_cm = 1 THEN 'Élu' ELSE 'Non élu' END AS resultat,
+            CASE
+                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%%CM-M%%' THEN 'Maire'
+                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%%CM-A%%' THEN 'Adjoint'
+                WHEN elu_cm = 1 THEN 'CM simple'
+                ELSE ''
+            END AS fonction,
+            CASE
+                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%%CC-VP%%' THEN 'VP CC'
+                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%%CC-P%%' AND position_cumul_2 NOT LIKE '%%CC-VP%%' THEN 'Pdt CC'
+                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%%CC%%' THEN 'CC'
+                ELSE ''
+            END AS interco,
+            CASE
+                WHEN mvmt_parlementaire IS NOT NULL AND mvmt_parlementaire != '' THEN mvmt_parlementaire
+                WHEN statut_cm_2 = 'Démissionnaire' THEN 'Démission CM'
+                ELSE ''
+            END AS issue,
+            COALESCE(nuance_parlementaire, '') AS nuance,
+            COALESCE(t_departement, t_csp, '') AS departement,
+            COALESCE(t_commune, '') AS commune
+        FROM {table}
+        WHERE LOWER(nom_elu) = LOWER(?) AND LOWER(prenom_elu) = LOWER(?)
+        LIMIT 1
+    """
+    results = {}
+    for year, table in [("2020", "mun_20"), ("2026", "mun_26")]:
+        rows = _query(sql_tpl.format(table=table), [nom, prenom])
+        if rows:
+            results[year] = rows[0]
+    return results
+

@@ -159,6 +159,12 @@ def get_parlementaire_photo(prenom: str = Query(...), nom: str = Query(...)):
     return RedirectResponse(url=url, status_code=302)
 
 
+@router.get("/person-timeline")
+def get_person_timeline(prenom: str = Query(...), nom: str = Query(...)):
+    """Parcours d'une personne sur 2020 et 2026."""
+    return service.person_timeline(prenom.strip(), nom.strip())
+
+
 @router.get("/bref-profile")
 def get_bref_profile(prenom: str = Query(...), nom: str = Query(...)):
     """Données BREF d'enrichissement : mandats, profession, naissance."""
