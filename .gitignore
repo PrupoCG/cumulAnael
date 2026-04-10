@@ -15,7 +15,6 @@ out/
 
 # Data
 data/*.duckdb
-data/*.xlsx
 data/elections/
 
 # Env
