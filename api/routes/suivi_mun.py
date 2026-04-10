@@ -237,11 +237,11 @@ def _check_available():
 # =====================================================================
 
 @router.get("/stats/hemicycle")
-def get_hemicycle(annee: int = Query(26)):
-    """Données individuelles pour visualisation hémicycle."""
+def get_hemicycle(annee: int = Query(26), categorie: str = Query("depute")):
+    """Données individuelles pour visualisation hémicycle, filtrées par catégorie."""
     _check_available()
     try:
-        return svc.hemicycle_data(annee)
+        return svc.hemicycle_data(annee, categorie)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -270,7 +270,7 @@ function SankeyView({
           .then((r) => r.ok ? r.json() : null)
           .then((s) => { if (s) setNodeStats(s); })
           .catch(() => {});
-        fetch(`${API_URL}/api/suivi-mun/stats/hemicycle?annee=${annee}`)
+        fetch(`${API_URL}/api/suivi-mun/stats/hemicycle?annee=${annee}&categorie=${selected}`)
           .then((r) => r.ok ? r.json() : null)
           .then((h) => { if (h) setHemicycleData(h); })
           .catch(() => {});

@@ -3395,13 +3395,19 @@ def person_timeline(prenom: str, nom: str) -> dict:
 # Hemicycle data (individual-level for circle packing)
 # =====================================================================
 
-def hemicycle_data(annee: int) -> dict:
+def hemicycle_data(annee: int, categorie: str = "depute") -> dict:
     """Return individual-level data for hemicycle visualization.
 
+    Filtered by categorie (depute/senateur/rpe).
     Each person has: nom, prenom, nuance, nuporec, demissionnaire flag.
-    Grouped by NuPoREC for circle packing layout.
     """
+    CAT_WHERE = {
+        "depute": "(position_cumul_1 LIKE 'D' OR position_cumul_1 LIKE 'D / %')",
+        "senateur": "(position_cumul_1 LIKE 'S' OR position_cumul_1 LIKE 'S / %')",
+        "rpe": "(position_cumul_1 LIKE 'RPE' OR position_cumul_1 LIKE 'RPE / %')",
+    }
     table = _get_table(annee)
+    where = CAT_WHERE.get(categorie, CAT_WHERE["depute"])
     rows = _query(f"""
         SELECT
             nom_elu AS nom,
@@ -3413,6 +3419,7 @@ def hemicycle_data(annee: int) -> dict:
                 ELSE 0
             END AS demissionnaire
         FROM {table}
+        WHERE {where}
         ORDER BY NuPoREC, nuance_parlementaire, nom_elu
     """)
     return {"persons": rows, "total": len(rows)}
