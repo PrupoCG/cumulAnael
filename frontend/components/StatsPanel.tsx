@@ -645,7 +645,7 @@ const DIVERGING_TOOLTIP_STYLES = {
 };
 
 const DIVERGING_W = 600;
-const DIVERGING_MARGIN = { top: 16, right: 16, bottom: 32, left: 90 };
+const DIVERGING_MARGIN = { top: 16, right: 16, bottom: 52, left: 90 };
 
 type DivergingTooltipData = {
   nuance: string;
@@ -725,7 +725,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
   }
 
   return (
-    <div>
+    <div className="w-full">
       {/* Header */}
       <div className="px-1 mb-2 flex items-start justify-between">
         <div>
@@ -769,7 +769,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
       </div>
 
       {/* Chart */}
-      <div ref={containerRef} className="mx-auto" style={{ maxHeight: "65vh", overflow: "auto", maxWidth: "600px" }}>
+      <div ref={containerRef} className="mx-auto w-full" style={{ maxHeight: "65vh", overflow: "auto", maxWidth: "600px" }}>
         <svg
           width="100%"
           viewBox={`0 0 ${DIVERGING_W} ${chartHeight}`}
@@ -884,7 +884,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
 
             {/* Axis annotations */}
             <Text
-              x={centerX + innerWidth * 0.25} y={innerHeight + 38}
+              x={centerX + innerWidth * 0.25} y={innerHeight + 40}
               textAnchor="middle" fill="#10b981"
               fontSize={10} fontWeight={600}
               fontFamily="Inter, system-ui, sans-serif"
@@ -892,7 +892,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
               {"← Élus →"}
             </Text>
             <Text
-              x={centerX - innerWidth * 0.25} y={innerHeight + 38}
+              x={centerX - innerWidth * 0.25} y={innerHeight + 40}
               textAnchor="middle" fill="#ef4444"
               fontSize={10} fontWeight={600}
               fontFamily="Inter, system-ui, sans-serif"
