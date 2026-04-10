@@ -644,8 +644,8 @@ const DIVERGING_TOOLTIP_STYLES = {
   border: "1px solid rgba(255,255,255,0.08)",
 };
 
-const DIVERGING_W = 500;
-const DIVERGING_MARGIN = { top: 16, right: 20, bottom: 32, left: 50 };
+const DIVERGING_W = 520;
+const DIVERGING_MARGIN = { top: 16, right: 20, bottom: 32, left: 80 };
 
 type DivergingTooltipData = {
   nuance: string;
