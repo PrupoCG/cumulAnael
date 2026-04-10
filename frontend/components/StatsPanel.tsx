@@ -769,7 +769,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
       </div>
 
       {/* Chart */}
-      <div ref={containerRef} className="mx-auto w-full" style={{ maxHeight: "65vh", overflow: "auto", maxWidth: "700px" }}>
+      <div ref={containerRef} className="w-full" style={{ maxHeight: "65vh", overflow: "auto" }}>
         <svg
           width="100%"
           viewBox={`0 0 ${DIVERGING_W} ${chartHeight}`}
