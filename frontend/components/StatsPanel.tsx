@@ -28,6 +28,7 @@ type EfficaciteNuance = {
 
 export type EfficaciteStats = {
   nuances: EfficaciteNuance[];
+  nuporec?: EfficaciteNuance[];
   total_candidats: number;
   total_elus: number;
 };
@@ -643,8 +644,8 @@ const DIVERGING_TOOLTIP_STYLES = {
   border: "1px solid rgba(255,255,255,0.08)",
 };
 
-const DIVERGING_W = 820;
-const DIVERGING_MARGIN = { top: 30, right: 30, bottom: 50, left: 75 };
+const DIVERGING_W = 600;
+const DIVERGING_MARGIN = { top: 20, right: 25, bottom: 40, left: 60 };
 
 type DivergingTooltipData = {
   nuance: string;
@@ -656,23 +657,27 @@ type DivergingTooltipData = {
 };
 
 function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
+  const [mode, setMode] = useState<"nuances" | "nuporec">("nuances");
   const {
     tooltipOpen, tooltipLeft, tooltipTop, tooltipData,
     hideTooltip, showTooltip,
   } = useTooltip<DivergingTooltipData>();
   const { containerRef, TooltipInPortal } = useTooltipInPortal({ scroll: true });
 
+  const hasNuporec = data.nuporec && data.nuporec.length > 0;
+  const rows = mode === "nuporec" && hasNuporec ? data.nuporec! : data.nuances;
+
   const innerWidth = DIVERGING_W - DIVERGING_MARGIN.left - DIVERGING_MARGIN.right;
-  const chartHeight = Math.max(480, data.nuances.length * 24 + DIVERGING_MARGIN.top + DIVERGING_MARGIN.bottom);
+  const chartHeight = Math.max(320, rows.length * 18 + DIVERGING_MARGIN.top + DIVERGING_MARGIN.bottom);
   const innerHeight = chartHeight - DIVERGING_MARGIN.top - DIVERGING_MARGIN.bottom;
 
   const yScale = useMemo(
     () => scaleBand<string>({
-      domain: data.nuances.map((d) => d.nuance),
+      domain: rows.map((d) => d.nuance),
       range: [0, innerHeight],
-      padding: 0.3,
+      padding: 0.25,
     }),
-    [data.nuances, innerHeight],
+    [rows, innerHeight],
   );
 
   const xScale = useMemo(
@@ -710,7 +715,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
     return Math.round((data.total_elus / data.total_candidats) * 100);
   }, [data]);
 
-  if (!data.nuances.length) {
+  if (!rows.length) {
     return (
       <div className="bg-slate-50/40 rounded-xl p-4">
         <h4 className="text-[13px] font-semibold text-slate-700 mb-1">Efficacité électorale</h4>
@@ -722,11 +727,33 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
   return (
     <div>
       {/* Header */}
-      <div className="px-1 mb-3">
-        <h4 className="text-[15px] font-bold text-slate-800">Efficacité électorale</h4>
-        <p className="text-[11px] text-slate-400 mt-0.5">
-          {data.total_candidats} parlementaires candidats — {data.total_elus} élus ({avgTauxElection}% de réussite globale)
-        </p>
+      <div className="px-1 mb-2 flex items-start justify-between">
+        <div>
+          <h4 className="text-[13px] font-bold text-slate-800">Efficacité électorale</h4>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            {data.total_candidats} parlementaires candidats — {data.total_elus} élus ({avgTauxElection}% de réussite globale)
+          </p>
+        </div>
+        {hasNuporec && (
+          <div className="flex gap-1">
+            <button
+              onClick={() => setMode("nuances")}
+              className={`px-2 py-0.5 text-[10px] font-medium rounded-full transition-colors ${
+                mode === "nuances" ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+              }`}
+            >
+              Nuance parl.
+            </button>
+            <button
+              onClick={() => setMode("nuporec")}
+              className={`px-2 py-0.5 text-[10px] font-medium rounded-full transition-colors ${
+                mode === "nuporec" ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+              }`}
+            >
+              NuPoREC
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Legend */}
@@ -767,7 +794,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
             />
 
             {/* Bars */}
-            {data.nuances.map((row) => {
+            {rows.map((row) => {
               const barY = yScale(row.nuance) ?? 0;
               const barH = yScale.bandwidth();
               const elusWidth = xScale(row.taux_election) - centerX;
@@ -794,10 +821,10 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
                   />
                   {/* Nuance label (left) */}
                   <Text
-                    x={-8} y={barY + barH / 2}
+                    x={-6} y={barY + barH / 2}
                     textAnchor="end" verticalAnchor="middle"
-                    fill={nuanceColor(row.nuance)}
-                    fontSize={12} fontWeight={700}
+                    fill={mode === "nuporec" ? nuporecColor(row.nuance) : nuanceColor(row.nuance)}
+                    fontSize={10} fontWeight={700}
                     fontFamily="Inter, system-ui, sans-serif"
                   >
                     {row.nuance}
@@ -807,7 +834,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
                     <Text
                       x={centerX + elusWidth - 6} y={barY + barH / 2}
                       textAnchor="end" verticalAnchor="middle"
-                      fill="#fff" fontSize={10} fontWeight={700}
+                      fill="#fff" fontSize={9} fontWeight={700}
                       fontFamily="Inter, system-ui, sans-serif"
                     >
                       {`${row.taux_election}%`}
@@ -818,7 +845,7 @@ function DivergingReussiteChart({ data }: { data: EfficaciteStats }) {
                     <Text
                       x={centerX - battusWidth + 6} y={barY + barH / 2}
                       textAnchor="start" verticalAnchor="middle"
-                      fill="#fff" fontSize={10} fontWeight={600}
+                      fill="#fff" fontSize={9} fontWeight={600}
                       fontFamily="Inter, system-ui, sans-serif"
                     >
                       {`${row.taux_defaite}%`}

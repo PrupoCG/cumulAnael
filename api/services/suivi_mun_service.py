@@ -2051,6 +2051,29 @@ def filtered_stats(annee: int = 20, **kwargs) -> dict:
     efficacite_total_candidats = sum(n["candidats"] for n in efficacite_nuances)
     efficacite_total_elus = sum(n["elus"] for n in efficacite_nuances)
 
+    efficacite_nuporec_rows = _query(f"""
+        SELECT
+            COALESCE(NuPoREC, 'Inconnu') AS nuance,
+            COUNT(*) AS candidats,
+            SUM(CASE WHEN elu_cm = 1 THEN 1 ELSE 0 END) AS elus,
+            SUM(CASE WHEN elu_cm = 0 THEN 1 ELSE 0 END) AS battus
+        FROM {table}
+        WHERE {where} AND statut_candidature != '0_noncandidat'
+        GROUP BY 1
+        ORDER BY (CAST(SUM(CASE WHEN elu_cm = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*)) DESC
+    """)
+    efficacite_nuporec = []
+    for row in efficacite_nuporec_rows:
+        c = row["candidats"] or 1
+        efficacite_nuporec.append({
+            "nuance": row["nuance"],
+            "candidats": c,
+            "elus": row["elus"] or 0,
+            "battus": row["battus"] or 0,
+            "taux_election": round(((row["elus"] or 0) / c) * 100, 1),
+            "taux_defaite": round(((row["battus"] or 0) / c) * 100, 1),
+        })
+
     return {
         "total": total,
         "nuances": nuances,
@@ -2061,6 +2084,7 @@ def filtered_stats(annee: int = 20, **kwargs) -> dict:
         "fonctions": fonctions,
         "efficacite": {
             "nuances": efficacite_nuances,
+            "nuporec": efficacite_nuporec,
             "total_candidats": efficacite_total_candidats,
             "total_elus": efficacite_total_elus,
         },
