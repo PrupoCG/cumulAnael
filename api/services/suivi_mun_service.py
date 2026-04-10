@@ -3360,15 +3360,15 @@ def person_timeline(prenom: str, nom: str) -> dict:
             END AS candidature,
             CASE WHEN elu_cm = 1 THEN 'Élu' ELSE 'Non élu' END AS resultat,
             CASE
-                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%%CM-M%%' THEN 'Maire'
-                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%%CM-A%%' THEN 'Adjoint'
+                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%CM-M%' THEN 'Maire'
+                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%CM-A%' THEN 'Adjoint'
                 WHEN elu_cm = 1 THEN 'CM simple'
                 ELSE ''
             END AS fonction,
             CASE
-                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%%CC-VP%%' THEN 'VP CC'
-                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%%CC-P%%' AND position_cumul_2 NOT LIKE '%%CC-VP%%' THEN 'Pdt CC'
-                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%%CC%%' THEN 'CC'
+                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%CC-VP%' THEN 'VP CC'
+                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%CC-P%' AND position_cumul_2 NOT LIKE '%CC-VP%' THEN 'Pdt CC'
+                WHEN elu_cm = 1 AND position_cumul_2 LIKE '%CC%' THEN 'CC'
                 ELSE ''
             END AS interco,
             CASE
