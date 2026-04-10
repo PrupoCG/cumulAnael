@@ -80,104 +80,130 @@ function formatDate(d: string | null): string {
 // MiniTimeline – visx horizontal milestone chart
 // ---------------------------------------------------------------------------
 
-const NODE_R = 4;
+// ---------------------------------------------------------------------------
+// Chronological event builder — one event per election on the timeline
+// ---------------------------------------------------------------------------
 
-// Map mandate codes to election type + approximate date by year context
-const MANDAT_ELECTIONS: Record<string, Record<string, string>> = {
-  "D":   { "2020": "Lég. juin 2017", "2026": "Lég. 2022/24" },
-  "S":   { "2020": "Sén. sept 2017", "2026": "Sén. 2020/23" },
-  "RPE": { "2020": "Eur. mai 2019",  "2026": "Eur. juin 2024" },
-  "CD":  { "2020": "Dép. mars 2015", "2026": "Dép. juin 2021" },
-  "CR":  { "2020": "Rég. déc 2015",  "2026": "Rég. juin 2021" },
+type TlEvent = {
+  date: number;       // sortable numeric date (YYYYMM)
+  dateLabel: string;   // e.g. "juin 2017"
+  election: string;    // e.g. "Législatives"
+  details: string[];   // e.g. ["Député"]
+  color: string;       // dot color
+  bg: string;          // badge bg
+  fg: string;          // badge fg
 };
 
-function enrichMandatLabel(raw: string, year: string): string {
-  if (!raw) return raw;
-  const parts = raw.split(/\s*\/\s*/);
-  return parts.map(p => {
-    const info = MANDAT_ELECTIONS[p.trim()]?.[year];
-    return info ? `${p.trim()} (${info})` : p.trim();
-  }).join(" · ");
-}
-
-const BADGE_COLORS: Record<string, { bg: string; text: string }> = {
-  mandat: { bg: "#dbeafe", text: "#1d4ed8" },
-  candidature: { bg: "#f3e8ff", text: "#7c3aed" },
-  elu: { bg: "#d1fae5", text: "#047857" },
-  nonelu: { bg: "#f1f5f9", text: "#475569" },
-  fonction: { bg: "#dcfce7", text: "#15803d" },
-  interco: { bg: "#ccfbf1", text: "#0f766e" },
-  demission_parl: { bg: "#ffedd5", text: "#c2410c" },
-  demission_cm: { bg: "#fef3c7", text: "#b45309" },
+const MANDAT_CODE_MAP: Record<string, { election: string; detail: string; bg: string; fg: string }> = {
+  "D":   { election: "Législatives",     detail: "Député",      bg: "#dbeafe", fg: "#1d4ed8" },
+  "S":   { election: "Sénatoriales",     detail: "Sénateur",    bg: "#e0e7ff", fg: "#4338ca" },
+  "RPE": { election: "Européennes",      detail: "Eurodéputé",  bg: "#f3e8ff", fg: "#7c3aed" },
+  "CD":  { election: "Départementales",  detail: "Cons. dép.",  bg: "#ccfbf1", fg: "#0f766e" },
+  "CR":  { election: "Régionales",       detail: "Cons. rég.",  bg: "#d1fae5", fg: "#047857" },
 };
 
-function getBadges(year: TimelineYear | undefined, yearKey: string): { label: string; type: string }[] {
-  if (!year) return [];
-  const badges: { label: string; type: string }[] = [];
-  if (year.mandat_national) badges.push({ label: enrichMandatLabel(year.mandat_national, yearKey), type: "mandat" });
-  if (year.candidature && year.candidature !== "Non candidat") badges.push({ label: year.candidature, type: "candidature" });
-  if (year.resultat === "Élu") {
-    badges.push({ label: year.fonction ? `Élu · ${year.fonction}` : "Élu", type: "elu" });
-  } else if (year.candidature && year.candidature !== "Non candidat") {
-    badges.push({ label: "Non élu", type: "nonelu" });
+// Approximate election dates for mandates held at each municipal election
+const MANDAT_DATES: Record<string, Record<string, { date: number; label: string }>> = {
+  "D":   { "2020": { date: 201706, label: "juin 2017" },  "2026": { date: 202206, label: "juin 2022" } },
+  "S":   { "2020": { date: 201709, label: "sept 2017" },  "2026": { date: 202309, label: "sept 2023" } },
+  "RPE": { "2020": { date: 201905, label: "mai 2019" },   "2026": { date: 202406, label: "juin 2024" } },
+  "CD":  { "2020": { date: 201503, label: "mars 2015" },  "2026": { date: 202106, label: "juin 2021" } },
+  "CR":  { "2020": { date: 201512, label: "déc 2015" },   "2026": { date: 202106, label: "juin 2021" } },
+};
+
+function buildTimelineEvents(data: TimelineData): TlEvent[] {
+  const events: TlEvent[] = [];
+  const seen = new Set<string>();
+
+  for (const [yearKey, yearData] of Object.entries(data) as [string, TimelineYear][]) {
+    // Mandate events from mandat_national (e.g. "D / CD")
+    if (yearData.mandat_national) {
+      const codes = yearData.mandat_national.split(/\s*\/\s*/);
+      for (const code of codes) {
+        const c = code.trim();
+        const meta = MANDAT_CODE_MAP[c];
+        const dateMeta = MANDAT_DATES[c]?.[yearKey];
+        if (meta && dateMeta) {
+          const key = `${c}-${dateMeta.date}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            events.push({
+              date: dateMeta.date,
+              dateLabel: dateMeta.label,
+              election: meta.election,
+              details: [meta.detail],
+              color: meta.fg,
+              bg: meta.bg,
+              fg: meta.fg,
+            });
+          }
+        }
+      }
+    }
+
+    // Municipal election event
+    const munDate = yearKey === "2020" ? 202003 : 202603;
+    const munLabel = yearKey === "2020" ? "mars 2020" : "mars 2026";
+    const munDetails: string[] = [];
+    if (yearData.candidature && yearData.candidature !== "Non candidat") munDetails.push(yearData.candidature);
+    if (yearData.resultat === "Élu") {
+      munDetails.push(yearData.fonction ? `Élu · ${yearData.fonction}` : "Élu");
+    } else if (yearData.candidature && yearData.candidature !== "Non candidat") {
+      munDetails.push("Non élu");
+    }
+    if (yearData.interco) munDetails.push(yearData.interco);
+    if (yearData.issue === "Démissionnaire") munDetails.push("Démission parl.");
+    if (yearData.issue === "Démission CM") munDetails.push("Démission CM");
+
+    const isElu = yearData.resultat === "Élu";
+    events.push({
+      date: munDate,
+      dateLabel: munLabel,
+      election: "Municipales",
+      details: munDetails.length ? munDetails : ["Non candidat"],
+      color: isElu ? "#10b981" : (yearData.candidature && yearData.candidature !== "Non candidat" ? "#ef4444" : "#94a3b8"),
+      bg: isElu ? "#d1fae5" : "#f1f5f9",
+      fg: isElu ? "#047857" : "#475569",
+    });
   }
-  if (year.interco) badges.push({ label: year.interco, type: "interco" });
-  if (year.issue === "Démissionnaire") badges.push({ label: "Démission parl.", type: "demission_parl" });
-  if (year.issue === "Démission CM") badges.push({ label: "Démission CM", type: "demission_cm" });
-  return badges;
-}
 
-function BadgeList({ badges, absent }: { badges: { label: string; type: string }[]; absent?: boolean }) {
-  if (absent) return <p className="text-[9px] text-slate-300 italic text-center mt-1">Absent</p>;
-  return (
-    <div className="flex flex-col items-center gap-0.5 mt-1">
-      {badges.map((b, i) => {
-        const c = BADGE_COLORS[b.type] || BADGE_COLORS.mandat;
-        return (
-          <span key={i} className="px-1.5 py-[1px] rounded-full text-[8px] font-semibold leading-tight whitespace-nowrap"
-            style={{ backgroundColor: c.bg, color: c.text }}>
-            {b.label}
-          </span>
-        );
-      })}
-    </div>
-  );
+  events.sort((a, b) => a.date - b.date);
+  return events;
 }
 
 function MiniTimeline({ data }: { data: TimelineData }) {
-  const has2020 = !!data["2020"];
-  const has2026 = !!data["2026"];
-  if (!has2020 && !has2026) return null;
-
-  const badges2020 = getBadges(data["2020"], "2020");
-  const badges2026 = getBadges(data["2026"], "2026");
-
-  const nodeColor = (year: TimelineYear | undefined, present: boolean) =>
-    !present ? "#e2e8f0" : year?.resultat === "Élu" ? "#10b981" : "#ef4444";
+  const events = buildTimelineEvents(data);
+  if (events.length === 0) return null;
 
   return (
-    <div className="flex items-start gap-2">
-      {/* 2020 column */}
-      <div className="flex-1 flex flex-col items-center min-w-0">
-        <span className={`text-[9px] font-bold mb-1 ${has2020 ? "text-slate-700" : "text-slate-300"}`}>
-          15 mars 2020
-        </span>
-        <svg width="10" height="10"><circle cx="5" cy="5" r={NODE_R} fill={nodeColor(data["2020"], has2020)} /></svg>
-        <BadgeList badges={badges2020} absent={!has2020} />
-      </div>
+    <div className="relative">
+      {/* Horizontal line behind dots */}
+      <div className="absolute left-0 right-0 top-[6px] h-px bg-slate-200" />
 
-      {/* Connection line */}
-      <div className="flex items-center pt-5">
-        <div className={`w-8 border-t ${has2020 && has2026 ? "border-slate-300" : "border-dashed border-slate-200"}`} />
-      </div>
-
-      {/* 2026 column */}
-      <div className="flex-1 flex flex-col items-center min-w-0">
-        <span className={`text-[9px] font-bold mb-1 ${has2026 ? "text-slate-700" : "text-slate-300"}`}>
-          15 mars 2026
-        </span>
-        <svg width="10" height="10"><circle cx="5" cy="5" r={NODE_R} fill={nodeColor(data["2026"], has2026)} /></svg>
-        <BadgeList badges={badges2026} absent={!has2026} />
+      {/* Events */}
+      <div className="relative flex justify-between gap-1">
+        {events.map((ev, i) => (
+          <div key={i} className="flex flex-col items-center min-w-0 flex-1">
+            {/* Dot */}
+            <div className="w-3 h-3 rounded-full border-2 border-white z-10 flex-shrink-0"
+              style={{ backgroundColor: ev.color }} />
+            {/* Date */}
+            <span className="text-[7px] font-bold text-slate-500 mt-1 whitespace-nowrap">{ev.dateLabel}</span>
+            {/* Election type */}
+            <span className="text-[7px] font-semibold mt-0.5 whitespace-nowrap" style={{ color: ev.fg }}>
+              {ev.election}
+            </span>
+            {/* Detail badges */}
+            <div className="flex flex-col items-center gap-[1px] mt-0.5">
+              {ev.details.map((d, j) => (
+                <span key={j} className="px-1 py-[0.5px] rounded-full text-[6.5px] font-medium leading-tight whitespace-nowrap"
+                  style={{ backgroundColor: ev.bg, color: ev.fg }}>
+                  {d}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
