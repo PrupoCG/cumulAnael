@@ -2026,6 +2026,18 @@ def filtered_stats(annee: int = 20, **kwargs) -> dict:
         FROM {table} WHERE {where}
         GROUP BY 1 ORDER BY value DESC
     """)
+    efficacite_rows = _query(f"""
+        SELECT
+            COUNT(*) AS total,
+            ROUND(SUM(CASE WHEN statut_candidature != '0_noncandidat' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS taux_candidature,
+            ROUND(SUM(CASE WHEN elu_cm = 1 THEN 1 ELSE 0 END) * 100.0
+                / NULLIF(SUM(CASE WHEN statut_candidature != '0_noncandidat' THEN 1 ELSE 0 END), 0), 1) AS taux_election,
+            ROUND(SUM(CASE WHEN elu_cm = 1 AND (position_cumul_2 LIKE '%%CM-M%%' OR position_cumul_2 LIKE '%%CM-A%%')
+                THEN 1 ELSE 0 END) * 100.0
+                / NULLIF(SUM(CASE WHEN elu_cm = 1 THEN 1 ELSE 0 END), 0), 1) AS taux_executif,
+            ROUND(SUM(CASE WHEN mvmt_parlementaire = 'Démissionnaire' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS taux_demission
+        FROM {table} WHERE {where}
+    """)
 
     return {
         "total": total,
@@ -2035,6 +2047,7 @@ def filtered_stats(annee: int = 20, **kwargs) -> dict:
         "departements": departements,
         "age": age,
         "fonctions": fonctions,
+        "efficacite": efficacite_rows[0] if efficacite_rows else {},
     }
 
 

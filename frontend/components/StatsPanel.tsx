@@ -6,12 +6,21 @@ import { Group } from "@visx/group";
 import { scaleBand, scaleLinear } from "@visx/scale";
 import { Text } from "@visx/text";
 import { NUANCE_COLORS, nuanceColor } from "@/lib/nuanceColors";
+import { Users, Palette, Target } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type StatEntry = { label: string; value: number };
+
+export type EfficaciteStats = {
+  total: number;
+  taux_candidature: number | null;
+  taux_election: number | null;
+  taux_executif: number | null;
+  taux_demission: number | null;
+};
 
 export type NodeStats = {
   total: number;
@@ -21,6 +30,7 @@ export type NodeStats = {
   departements: StatEntry[];
   age: StatEntry[];
   fonctions: StatEntry[];
+  efficacite?: EfficaciteStats;
 };
 
 export type StatsPanelProps = {
@@ -601,78 +611,154 @@ function nuporecColor(label: string): string {
   return NUPOREC_COLORS[label] ?? "#94a3b8";
 }
 
+type ViewKey = "profil" | "nuances" | "efficacite";
+
+const VIEW_BUTTONS: { key: ViewKey; label: string; icon: typeof Users }[] = [
+  { key: "profil", label: "Profil", icon: Users },
+  { key: "nuances", label: "Nuances", icon: Palette },
+  { key: "efficacite", label: "Efficacité", icon: Target },
+];
+
+function GaugeCard({ label, value, color, description }: {
+  label: string; value: number | null; color: string; description: string;
+}) {
+  return (
+    <div className="bg-slate-50/40 rounded-xl border border-slate-100 p-4">
+      <p className="text-[11px] font-medium text-slate-500 mb-2">{label}</p>
+      <p className="text-[28px] font-bold" style={{ color }}>{value ?? 0}%</p>
+      <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${Math.min(value ?? 0, 100)}%`, backgroundColor: color }}
+        />
+      </div>
+      <p className="text-[10px] text-slate-400 mt-1.5">{description}</p>
+    </div>
+  );
+}
+
 export default function StatsPanel({ stats, title }: StatsPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [nuanceMode, setNuanceMode] = useState<"parlementaire" | "nuporec">("parlementaire");
+  const [view, setView] = useState<ViewKey>("profil");
 
   const hasNuporec = stats.nuporec && stats.nuporec.length > 0;
 
   return (
     <div className="mt-5 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm shadow-slate-200/30 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-100/80 bg-slate-50/60">
-        <h3 className="text-[14px] font-bold text-slate-800">{title}</h3>
-        <p className="text-[11px] text-slate-400 mt-0.5">{stats.total} personne{stats.total > 1 ? "s" : ""}</p>
+      <div className="px-4 py-3 border-b border-slate-100/80 bg-slate-50/60 flex items-center justify-between">
+        <div>
+          <h3 className="text-[14px] font-bold text-slate-800">{title}</h3>
+          <p className="text-[11px] text-slate-400 mt-0.5">{stats.total} personne{stats.total > 1 ? "s" : ""}</p>
+        </div>
+        <div className="flex gap-1">
+          {VIEW_BUTTONS.map((v) => (
+            <button
+              key={v.key}
+              onClick={() => { setView(v.key); setExpanded(null); }}
+              className={`px-2.5 py-1 text-[11px] font-medium rounded-full flex items-center gap-1 transition-colors ${
+                view === v.key
+                  ? "bg-slate-700 text-white"
+                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+              }`}
+            >
+              <v.icon size={11} />
+              {v.label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
-        <ChartWrapper id="nuances" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
-          <div className="relative">
-            {hasNuporec && (
-              <div className="flex gap-1 mb-2">
-                <button
-                  onClick={() => setNuanceMode("parlementaire")}
-                  className={`px-2 py-0.5 text-[11px] font-medium rounded-full transition-colors ${
-                    nuanceMode === "parlementaire"
-                      ? "bg-slate-700 text-white"
-                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                  }`}
-                >
-                  Nuance parl.
-                </button>
-                <button
-                  onClick={() => setNuanceMode("nuporec")}
-                  className={`px-2 py-0.5 text-[11px] font-medium rounded-full transition-colors ${
-                    nuanceMode === "nuporec"
-                      ? "bg-slate-700 text-white"
-                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                  }`}
-                >
-                  NuPoREC
-                </button>
-              </div>
-            )}
+
+      {/* Vue Profil */}
+      {view === "profil" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+          <ChartWrapper id="nuances" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
             <DonutChart
-              title={nuanceMode === "nuporec" ? "NuPoREC" : "Nuances politiques"}
-              data={nuanceMode === "nuporec" && stats.nuporec ? stats.nuporec : stats.nuances}
-              colorFn={nuanceMode === "nuporec" ? nuporecColor : nuanceColor}
+              title="Nuances politiques"
+              data={stats.nuances}
+              colorFn={nuanceColor}
               large={expanded === "nuances"}
             />
-          </div>
-        </ChartWrapper>
-        <ChartWrapper id="genre" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
+          </ChartWrapper>
+          <ChartWrapper id="genre" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
+            <DonutChart
+              title="Genre"
+              data={stats.genre}
+              colorFn={(label) => GENRE_COLORS[label] ?? "#94a3b8"}
+              large={expanded === "genre"}
+            />
+          </ChartWrapper>
+          <ChartWrapper id="carte" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
+            <DeptMiniMap
+              title="Carte des départements"
+              data={stats.departements}
+              width={expanded === "carte" ? 560 : 280}
+              height={expanded === "carte" ? 480 : 240}
+            />
+          </ChartWrapper>
+          <ChartWrapper id="age" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
+            <HorizontalBarChart
+              title="Tranches d'âge"
+              data={stats.age}
+              colorFn={(_label, i) => AGE_COLORS[i % AGE_COLORS.length]}
+              large={expanded === "age"}
+            />
+          </ChartWrapper>
+        </div>
+      )}
+
+      {/* Vue Nuances */}
+      {view === "nuances" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
           <DonutChart
-            title="Genre"
-            data={stats.genre}
-            colorFn={(label) => GENRE_COLORS[label] ?? "#94a3b8"}
-            large={expanded === "genre"}
+            title="Nuances parlementaires"
+            data={stats.nuances}
+            colorFn={nuanceColor}
+            large
           />
-        </ChartWrapper>
-        <ChartWrapper id="carte" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
-          <DeptMiniMap
-            title="Carte des départements"
-            data={stats.departements}
-            width={expanded === "carte" ? 560 : 280}
-            height={expanded === "carte" ? 480 : 240}
+          {hasNuporec ? (
+            <DonutChart
+              title="NuPoREC"
+              data={stats.nuporec!}
+              colorFn={nuporecColor}
+              large
+            />
+          ) : (
+            <div className="bg-slate-50/40 rounded-xl p-4 flex items-center justify-center">
+              <p className="text-[12px] text-slate-400 italic">Données NuPoREC indisponibles</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Vue Efficacité */}
+      {view === "efficacite" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+          <GaugeCard
+            label="Taux de candidature"
+            value={stats.efficacite?.taux_candidature ?? null}
+            color="#f59e0b"
+            description="Parlementaires s'étant présentés aux municipales"
           />
-        </ChartWrapper>
-        <ChartWrapper id="age" expanded={expanded} onExpand={setExpanded} onCollapse={() => setExpanded(null)}>
-          <HorizontalBarChart
-            title="Tranches d'âge"
-            data={stats.age}
-            colorFn={(_label, i) => AGE_COLORS[i % AGE_COLORS.length]}
-            large={expanded === "age"}
+          <GaugeCard
+            label="Taux d'élection"
+            value={stats.efficacite?.taux_election ?? null}
+            color="#3b82f6"
+            description="Candidats élus au conseil municipal"
           />
-        </ChartWrapper>
-      </div>
+          <GaugeCard
+            label="Taux d'accès à l'exécutif"
+            value={stats.efficacite?.taux_executif ?? null}
+            color="#10b981"
+            description="Élus devenus maire ou adjoint"
+          />
+          <GaugeCard
+            label="Taux de démission parlementaire"
+            value={stats.efficacite?.taux_demission ?? null}
+            color="#ef4444"
+            description="Parlementaires ayant démissionné de leur mandat"
+          />
+        </div>
+      )}
     </div>
   );
 }
