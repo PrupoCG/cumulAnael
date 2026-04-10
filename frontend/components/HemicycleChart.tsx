@@ -62,6 +62,17 @@ const NUPOREC_COLORS: Record<string, string> = {
 
 type Seat = { x: number; y: number; person: HemicyclePerson };
 
+/**
+ * Compute hemicycle seat positions.
+ *
+ * Strategy:
+ * 1. Determine seat size, row count, and radii.
+ * 2. Compute total seat capacity across all rows.
+ * 3. Assign each NuPoREC group a contiguous angular sector proportional
+ *    to its member count, with small gaps between groups.
+ * 4. Within each sector, distribute members evenly across rows (each row
+ *    gets a proportional share), then space them evenly along the arc.
+ */
 function computeSeats(
   persons: HemicyclePerson[],
   width: number,
@@ -70,108 +81,122 @@ function computeSeats(
   const total = persons.length;
   if (total === 0) return { seats: [], seatRadius: 3 };
 
-  // Group by NuPoREC, sorted left→right
+  // -- Group persons by NuPoREC, sorted left → right -----------------------
   const groupMap = new Map<string, HemicyclePerson[]>();
   for (const p of persons) {
     const g = groupMap.get(p.nuporec) || [];
     g.push(p);
     groupMap.set(p.nuporec, g);
   }
-  const groups = Array.from(groupMap.entries())
-    .sort((a, b) => (NUPOREC_ORDER[a[0]] ?? 99) - (NUPOREC_ORDER[b[0]] ?? 99));
+  const groups = Array.from(groupMap.entries()).sort(
+    (a, b) => (NUPOREC_ORDER[a[0]] ?? 99) - (NUPOREC_ORDER[b[0]] ?? 99),
+  );
 
+  // -- Geometry constants ---------------------------------------------------
   const cx = width / 2;
   const cy = height - 2;
 
-  // Compute seat radius based on count
-  const seatRadius = Math.max(2, Math.min(6, width / (Math.sqrt(total) * 3.2)));
+  // Seat radius scaled to fit all seats; clamped 3–7px
+  const seatRadius = Math.max(
+    3,
+    Math.min(7, width / (Math.sqrt(total) * 3)),
+  );
   const diameter = seatRadius * 2;
+  // Tiny padding between circles so they don't visually merge
+  const spacing = diameter + seatRadius * 0.15;
 
-  const rMin = diameter * 2;
-  const rMax = Math.min(width / 2 - seatRadius - 2, height - seatRadius - 4);
+  const rMin = width * 0.15;
+  const rMax = Math.min(width / 2 - seatRadius - 2, height - seatRadius - 6);
 
-  // Determine number of rows
-  const numRows = Math.max(3, Math.round((rMax - rMin) / diameter));
+  // Number of rows: pack as many as fit with ~diameter step
+  const numRows = Math.max(
+    3,
+    Math.floor((rMax - rMin) / spacing) + 1,
+  );
   const rowStep = (rMax - rMin) / (numRows - 1);
   const radii = Array.from({ length: numRows }, (_, i) => rMin + i * rowStep);
 
-  // Total arc-capacity across all rows (for proportional angular allocation)
-  const totalArcLen = radii.reduce((s, r) => s + Math.PI * r, 0);
+  // -- Determine how many seats each row can hold across the full π arc ----
+  // seats per row = floor(π * r / spacing)
+  const fullRowCapacities = radii.map((r) =>
+    Math.max(1, Math.floor((Math.PI * r) / spacing)),
+  );
+  const totalCapacity = fullRowCapacities.reduce((s, c) => s + c, 0);
 
-  // Each group gets an angular share proportional to its size
-  const groupGap = 0.02; // small angular gap between groups
-  const totalGap = groupGap * (groups.length - 1);
-  const usableAngle = Math.PI - totalGap;
+  // -- Assign angular sectors to groups ------------------------------------
+  // Each group gets an angular share proportional to its size.
+  const groupGap = 0.03; // radians gap between groups
+  const numGaps = Math.max(0, groups.length - 1);
+  const usableAngle = Math.PI - groupGap * numGaps;
 
-  // Compute angular sector for each group
   type GroupSector = {
     name: string;
     persons: HemicyclePerson[];
-    startAngle: number;
-    endAngle: number;
+    startAngle: number; // left edge (higher angle)
+    endAngle: number; // right edge (lower angle)
   };
 
   const sectors: GroupSector[] = [];
-  let angle = Math.PI; // start from left (π)
+  let cursor = Math.PI; // start from left
 
   for (let gi = 0; gi < groups.length; gi++) {
     const [name, gpersons] = groups[gi];
     const share = gpersons.length / total;
     const sectorAngle = usableAngle * share;
-    const startAngle = angle;
-    const endAngle = angle - sectorAngle;
+    const startAngle = cursor;
+    const endAngle = cursor - sectorAngle;
     sectors.push({ name, persons: gpersons, startAngle, endAngle });
-    angle = endAngle - groupGap;
+    cursor = endAngle - groupGap;
   }
 
+  // -- Place seats ----------------------------------------------------------
   const seats: Seat[] = [];
 
   for (const sector of sectors) {
     const { persons: gpersons, startAngle, endAngle } = sector;
     const sectorSpan = startAngle - endAngle;
+    const groupSize = gpersons.length;
 
-    // Distribute group members across rows, filling from inner to outer
-    // Calculate how many seats fit per row in this sector
-    const rowCapacities = radii.map((r) => {
-      const arcLen = sectorSpan * r;
-      return Math.max(1, Math.floor(arcLen / diameter));
-    });
-    const totalCap = rowCapacities.reduce((s, c) => s + c, 0);
+    // How many seats fit on each row within this sector?
+    const rowCaps = radii.map((r) =>
+      Math.max(1, Math.floor((sectorSpan * r) / spacing)),
+    );
+    const sectorCapacity = rowCaps.reduce((s, c) => s + c, 0);
 
-    // Assign persons to rows proportionally
-    let personIdx = 0;
-    for (let ri = 0; ri < numRows && personIdx < gpersons.length; ri++) {
-      const remaining = gpersons.length - personIdx;
-      const remainingCap = rowCapacities.slice(ri).reduce((s, c) => s + c, 0);
-      const seatsInRow = Math.min(
-        rowCapacities[ri],
-        Math.round((rowCapacities[ri] / remainingCap) * remaining),
-      );
-      if (seatsInRow <= 0) continue;
-
-      const r = radii[ri];
-      // Place seats evenly within the sector
-      for (let j = 0; j < seatsInRow && personIdx < gpersons.length; j++) {
-        const theta =
-          seatsInRow === 1
-            ? (startAngle + endAngle) / 2
-            : startAngle - j * sectorSpan / (seatsInRow - 1);
-        const x = cx + r * Math.cos(theta);
-        const y = cy - r * Math.sin(theta);
-        seats.push({ x, y, person: gpersons[personIdx] });
-        personIdx++;
-      }
+    // Distribute group members across rows proportionally to each row's
+    // capacity. Use Largest Remainder Method for integer rounding.
+    const idealShares = rowCaps.map(
+      (cap) => (cap / sectorCapacity) * groupSize,
+    );
+    const floorShares = idealShares.map(Math.floor);
+    let assigned = floorShares.reduce((s, v) => s + v, 0);
+    // remainders sorted descending, give +1 to the largest remainders
+    const remainders = idealShares.map((v, i) => ({
+      i,
+      r: v - Math.floor(v),
+    }));
+    remainders.sort((a, b) => b.r - a.r);
+    for (let k = 0; assigned < groupSize && k < remainders.length; k++) {
+      floorShares[remainders[k].i]++;
+      assigned++;
     }
 
-    // Safety: remaining persons on last row
-    if (personIdx < gpersons.length) {
-      const r = radii[numRows - 1] + rowStep;
-      const remaining = gpersons.length - personIdx;
-      for (let j = 0; j < remaining; j++) {
-        const theta =
-          remaining === 1
-            ? (startAngle + endAngle) / 2
-            : startAngle - j * sectorSpan / (remaining - 1);
+    // Place each row's seats
+    let personIdx = 0;
+    for (let ri = 0; ri < numRows; ri++) {
+      const n = floorShares[ri];
+      if (n <= 0) continue;
+      const r = radii[ri];
+
+      for (let j = 0; j < n && personIdx < groupSize; j++) {
+        // Evenly space n seats within [endAngle, startAngle].
+        // With n seats, we want them centered in the sector.
+        // angle = startAngle - margin - j * step
+        // where margin = half of leftover arc on each side.
+        const arcForSeats = n > 1 ? (n - 1) * (spacing / r) : 0;
+        const margin = (sectorSpan - arcForSeats) / 2;
+        const theta = startAngle - margin - (n > 1 ? j * (arcForSeats / (n - 1)) : 0);
+
         const x = cx + r * Math.cos(theta);
         const y = cy - r * Math.sin(theta);
         seats.push({ x, y, person: gpersons[personIdx] });
@@ -187,7 +212,13 @@ function computeSeats(
 // Component
 // ---------------------------------------------------------------------------
 
-export default function HemicycleChart({ data, width = 700 }: { data: HemicycleData; width?: number }) {
+export default function HemicycleChart({
+  data,
+  width = 700,
+}: {
+  data: HemicycleData;
+  width?: number;
+}) {
   const [tooltip, setTooltip] = useState<{
     x: number;
     y: number;
@@ -203,7 +234,9 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
 
   const handleMouseEnter = useCallback(
     (e: React.MouseEvent, person: HemicyclePerson) => {
-      const rect = (e.currentTarget as SVGElement).closest("svg")?.getBoundingClientRect();
+      const rect = (
+        e.currentTarget as SVGElement
+      ).closest("svg")?.getBoundingClientRect();
       if (!rect) return;
       setTooltip({
         x: e.clientX - rect.left,
@@ -226,12 +259,17 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
     for (const p of data.persons) {
       seen.set(p.nuporec, (seen.get(p.nuporec) || 0) + 1);
     }
-    return Array.from(seen.entries())
-      .sort((a, b) => (NUPOREC_ORDER[a[0]] ?? 99) - (NUPOREC_ORDER[b[0]] ?? 99));
+    return Array.from(seen.entries()).sort(
+      (a, b) => (NUPOREC_ORDER[a[0]] ?? 99) - (NUPOREC_ORDER[b[0]] ?? 99),
+    );
   }, [data.persons]);
 
   if (data.persons.length === 0) {
-    return <p className="text-[12px] text-slate-400 italic text-center">Aucune donnée</p>;
+    return (
+      <p className="text-[12px] text-slate-400 italic text-center">
+        Aucune donnee
+      </p>
+    );
   }
 
   return (
@@ -239,10 +277,15 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
       {/* Legend */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2 justify-center">
         {legendEntries.map(([name, count]) => (
-          <div key={name} className="flex items-center gap-1 text-[10px] text-slate-600">
+          <div
+            key={name}
+            className="flex items-center gap-1 text-[10px] text-slate-600"
+          >
             <span
               className="inline-block w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: NUPOREC_COLORS[name] ?? "#94a3b8" }}
+              style={{
+                backgroundColor: NUPOREC_COLORS[name] ?? "#94a3b8",
+              }}
             />
             {name} ({count})
           </div>
@@ -255,7 +298,11 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
         )}
       </div>
 
-      <svg width={width} height={height} style={{ display: "block", margin: "0 auto" }}>
+      <svg
+        width={width}
+        height={height}
+        style={{ display: "block", margin: "0 auto" }}
+      >
         {seats.map((seat, i) => {
           const isDem = seat.person.demissionnaire === 1;
           return (
@@ -293,7 +340,9 @@ export default function HemicycleChart({ data, width = 700 }: { data: HemicycleD
             {tooltip.person.nuance} — {tooltip.person.nuporec}
           </div>
           {tooltip.person.demissionnaire === 1 && (
-            <div className="text-[10px] text-red-400 font-medium">Démissionnaire</div>
+            <div className="text-[10px] text-red-400 font-medium">
+              Démissionnaire
+            </div>
           )}
         </div>
       )}
