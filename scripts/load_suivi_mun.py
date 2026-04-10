@@ -42,11 +42,11 @@ def load():
     df_20.rename(columns=RENAME_MAP, inplace=True)
     df_26.rename(columns=RENAME_MAP, inplace=True)
 
-    # Corriger le typo "Démissionaire" → "Démissionnaire" (manque un 'n' en 2026)
+    # Corriger les typos "Démissionaire" / "Démissonaire" → "Démissionnaire"
     for frame in (df_20, df_26):
         if "mvmt_parlementaire" in frame.columns:
             frame["mvmt_parlementaire"] = frame["mvmt_parlementaire"].replace(
-                "Démissionaire", "Démissionnaire"
+                {"Démissionaire": "Démissionnaire", "Démissonaire": "Démissionnaire"}
             )
 
     # S'assurer que les colonnes attendues par le service existent
