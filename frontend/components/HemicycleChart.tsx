@@ -70,8 +70,8 @@ type Seat = { x: number; y: number; person: HemicyclePerson };
  * 2. Compute total seat capacity across all rows.
  * 3. Assign each NuPoREC group a contiguous angular sector proportional
  *    to its member count, with small gaps between groups.
- * 4. Within each sector, distribute members evenly across rows (each row
- *    gets a proportional share), then space them evenly along the arc.
+ * 4. Within each sector, fill each row to maximum capacity — seats touch
+ *    with no extra spacing, producing a dense packed hemicycle.
  */
 function computeSeats(
   persons: HemicyclePerson[],
@@ -99,16 +99,16 @@ function computeSeats(
   // Seat radius scaled to fit all seats; clamped 3–7px
   const seatRadius = Math.max(
     3,
-    Math.min(7, width / (Math.sqrt(total) * 3)),
+    Math.min(7, width / (Math.sqrt(total) * 2.8)),
   );
   const diameter = seatRadius * 2;
-  // Tiny padding between circles so they don't visually merge
-  const spacing = diameter + seatRadius * 0.15;
+  // Circles touch: spacing = diameter exactly (no extra gap)
+  const spacing = diameter;
 
   const rMin = width * 0.15;
   const rMax = Math.min(width / 2 - seatRadius - 2, height - seatRadius - 6);
 
-  // Number of rows: pack as many as fit with ~diameter step
+  // Number of rows: pack as many as fit with diameter step (rows touch)
   const numRows = Math.max(
     3,
     Math.floor((rMax - rMin) / spacing) + 1,
@@ -116,16 +116,9 @@ function computeSeats(
   const rowStep = (rMax - rMin) / (numRows - 1);
   const radii = Array.from({ length: numRows }, (_, i) => rMin + i * rowStep);
 
-  // -- Determine how many seats each row can hold across the full π arc ----
-  // seats per row = floor(π * r / spacing)
-  const fullRowCapacities = radii.map((r) =>
-    Math.max(1, Math.floor((Math.PI * r) / spacing)),
-  );
-  const totalCapacity = fullRowCapacities.reduce((s, c) => s + c, 0);
-
   // -- Assign angular sectors to groups ------------------------------------
   // Each group gets an angular share proportional to its size.
-  const groupGap = 0.03; // radians gap between groups
+  const groupGap = 0.015; // radians gap between groups (tight)
   const numGaps = Math.max(0, groups.length - 1);
   const usableAngle = Math.PI - groupGap * numGaps;
 
@@ -157,9 +150,9 @@ function computeSeats(
     const sectorSpan = startAngle - endAngle;
     const groupSize = gpersons.length;
 
-    // How many seats fit on each row within this sector?
+    // Maximum seats each row can hold within this sector (dense packing)
     const rowCaps = radii.map((r) =>
-      Math.max(1, Math.floor((sectorSpan * r) / spacing)),
+      Math.max(1, Math.floor((sectorSpan * r) / diameter)),
     );
     const sectorCapacity = rowCaps.reduce((s, c) => s + c, 0);
 
@@ -181,21 +174,22 @@ function computeSeats(
       assigned++;
     }
 
-    // Place each row's seats
+    // Place each row's seats — fill the sector edge-to-edge
     let personIdx = 0;
     for (let ri = 0; ri < numRows; ri++) {
       const n = floorShares[ri];
       if (n <= 0) continue;
       const r = radii[ri];
 
+      // Angular step between seat centers: spread n seats across the sector
+      // with minimal margin (half a seat angular width on each side).
+      const seatAngularWidth = diameter / r;
+      const margin = seatAngularWidth * 0.5;
+      const usable = sectorSpan - margin * 2;
+      const step = n > 1 ? usable / (n - 1) : 0;
+
       for (let j = 0; j < n && personIdx < groupSize; j++) {
-        // Evenly space n seats within [endAngle, startAngle].
-        // With n seats, we want them centered in the sector.
-        // angle = startAngle - margin - j * step
-        // where margin = half of leftover arc on each side.
-        const arcForSeats = n > 1 ? (n - 1) * (spacing / r) : 0;
-        const margin = (sectorSpan - arcForSeats) / 2;
-        const theta = startAngle - margin - (n > 1 ? j * (arcForSeats / (n - 1)) : 0);
+        const theta = startAngle - margin - j * step;
 
         const x = cx + r * Math.cos(theta);
         const y = cy - r * Math.sin(theta);
